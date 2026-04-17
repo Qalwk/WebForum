@@ -1,0 +1,12 @@
+node_modules
+dist
+.cursor
+.git
+.gitignore
+pyForum
+agent-tools
+agent-transcripts
+mcps
+photoTest
+*.log
+.env.local
