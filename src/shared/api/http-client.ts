@@ -17,6 +17,38 @@ export class HttpError extends Error {
   }
 }
 
+function messageFromApiPayload(payload: unknown, status: number): string {
+  if (typeof payload === 'object' && payload && 'message' in payload) {
+    const message = (payload as { message: unknown }).message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  }
+
+  if (typeof payload !== 'object' || !payload || !('detail' in payload)) {
+    return `Request failed with status ${status}`
+  }
+
+  const detail = (payload as { detail: unknown }).detail
+
+  if (typeof detail === 'string') {
+    return detail
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0]
+    if (typeof first === 'object' && first && 'msg' in first) {
+      return String((first as { msg: unknown }).msg)
+    }
+  }
+
+  if (typeof detail === 'object' && detail && 'message' in detail) {
+    return String((detail as { message: unknown }).message)
+  }
+
+  return `Request failed with status ${status}`
+}
+
 export async function requestJson<T>(
   path: string,
   options: RequestOptions = {},
@@ -45,17 +77,11 @@ export async function requestJson<T>(
   }
 
   if (!response.ok) {
-    const message =
-      typeof payload === 'object' &&
-      payload &&
-      'detail' in payload &&
-      typeof payload.detail === 'object' &&
-      payload.detail &&
-      'message' in payload.detail
-        ? String(payload.detail.message)
-        : `Request failed with status ${response.status}`
-
-    throw new HttpError(message, response.status, payload)
+    throw new HttpError(
+      messageFromApiPayload(payload, response.status),
+      response.status,
+      payload,
+    )
   }
 
   return payload as T

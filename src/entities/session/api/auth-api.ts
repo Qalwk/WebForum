@@ -5,6 +5,36 @@ type TelegramAuthResponse = {
   refresh_token: string | null
 }
 
+function messageFromAuthPayload(payload: unknown): string {
+  const fallback = 'Не удалось авторизоваться через Telegram Mini App.'
+
+  if (typeof payload === 'object' && payload && 'message' in payload) {
+    const message = (payload as { message: unknown }).message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  }
+
+  if (typeof payload !== 'object' || !payload || !('detail' in payload)) {
+    return fallback
+  }
+
+  const detail = (payload as { detail: unknown }).detail
+
+  if (typeof detail === 'string') {
+    return detail
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0]
+    if (typeof first === 'object' && first && 'msg' in first) {
+      return String((first as { msg: unknown }).msg)
+    }
+  }
+
+  return fallback
+}
+
 export async function authByTelegram(initDataRaw: string) {
   const response = await fetch(`${API_BASE_URL}/auth/telegram`, {
     method: 'POST',
@@ -17,11 +47,24 @@ export async function authByTelegram(initDataRaw: string) {
     }),
   })
 
-  const payload = (await response.json()) as TelegramAuthResponse | { detail?: unknown }
+  const text = await response.text()
+  let payload: unknown = null
 
-  if (!response.ok || !('access_token' in payload)) {
-    throw new Error('Не удалось авторизоваться через Telegram Mini App.')
+  if (text) {
+    try {
+      payload = JSON.parse(text) as unknown
+    } catch {
+      payload = { detail: text }
+    }
   }
 
-  return payload
+  if (!response.ok || !payload || typeof payload !== 'object') {
+    throw new Error(messageFromAuthPayload(payload))
+  }
+
+  if (!('access_token' in payload)) {
+    throw new Error(messageFromAuthPayload(payload))
+  }
+
+  return payload as TelegramAuthResponse
 }

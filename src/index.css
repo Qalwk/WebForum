@@ -1,10 +1,18 @@
+@font-face {
+  font-family: 'Telegram HPLHS';
+  src: url('/fonts/TelegramHPLHS.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   font-family:
     Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #111827;
-  background: #e9edf4;
+  background: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -17,6 +25,10 @@
   --page-accent-soft: #dbeafe;
   --page-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
   --page-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  /* Иконки главной: чёрные по умолчанию, голубые (#00a3ff) при нажатии */
+  --forum-home-icon-filter: brightness(0);
+  --forum-home-icon-active-filter: brightness(0) saturate(100%) invert(56%) sepia(85%)
+    saturate(2200%) hue-rotate(166deg) brightness(102%) contrast(101%);
 }
 
 * {
@@ -27,6 +39,7 @@ html,
 body,
 #root {
   min-height: 100svh;
+  background: #ffffff;
 }
 
 body {
@@ -51,9 +64,7 @@ a {
   padding: 24px 16px;
   display: flex;
   justify-content: center;
-  background:
-    radial-gradient(circle at top, rgba(37, 99, 235, 0.16), transparent 32%),
-    #eef2f7;
+  background: #ffffff;
 }
 
 .app-shell__phone {
@@ -97,13 +108,811 @@ a {
   gap: 8px;
 }
 
+.backend-diagnostics {
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.backend-diagnostics__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.backend-diagnostics__toggle:hover {
+  background: #f1f5f9;
+}
+
+.backend-diagnostics__toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.backend-diagnostics__badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.backend-diagnostics__badge--ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.backend-diagnostics__badge--warn {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.backend-diagnostics__badge--pending {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.backend-diagnostics__panel {
+  padding: 0 16px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.backend-diagnostics__host {
+  margin: 0;
+  font-size: 11px;
+  color: #64748b;
+  word-break: break-all;
+}
+
+.backend-diagnostics__retry {
+  justify-self: start;
+  font-size: 13px;
+  padding: 8px 14px;
+}
+
+.backend-diagnostics__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.backend-diagnostics__item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.backend-diagnostics__item--ok {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.backend-diagnostics__item--fail {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.backend-diagnostics__item-label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.backend-diagnostics__item-detail {
+  color: #475569;
+  line-height: 1.35;
+}
+
+.backend-diagnostics__hint {
+  margin: 0;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.page-notice {
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  background: #eff6ff;
+  display: grid;
+  gap: 10px;
+}
+
+.page-notice__text {
+  margin: 0;
+  color: #1d4ed8;
+  font-size: 14px;
+}
+
 .page {
   display: grid;
   gap: 16px;
 }
 
 .page--home {
-  padding-bottom: 16px;
+  /* место под фиксированный нижний навбар + системная безопасная зона */
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Главный экран — вёрстка и токены как в TestForum (Home.scss / FooterIcons.scss) */
+.forum-home-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0 4px;
+  background: var(--page-bg);
+}
+
+.forum-home-toolbar__icon-btn {
+  flex-shrink: 0;
+  width: 35px;
+  height: 35px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.forum-home-toolbar__icon-btn img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  display: block;
+  filter: var(--forum-home-icon-filter);
+  transition: filter 0.12s ease;
+}
+
+.forum-home-toolbar__icon-btn:active img {
+  filter: var(--forum-home-icon-active-filter);
+}
+
+.forum-home-toolbar__icon-btn:focus-visible {
+  outline: 2px solid #00a3ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.forum-home-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.forum-home-search {
+  flex: 1;
+  min-width: 0;
+  margin: 0 10px;
+  display: flex;
+  align-items: center;
+}
+
+.forum-home-search__input {
+  width: 100%;
+  padding: 10px;
+  background-color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  color: #000;
+  box-shadow: none;
+}
+
+.forum-home-search__input::placeholder {
+  color: #000;
+}
+
+.forum-home-notice {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: none;
+  background: #f6f7f9;
+  font-size: 13px;
+  color: #374151;
+  box-shadow: none;
+}
+
+.forum-home-notice p {
+  margin: 0;
+}
+
+.forum-home-theme {
+  display: grid;
+  gap: 0;
+  padding-bottom: 8px;
+}
+
+.forum-home-theme + .forum-home-theme {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--page-divider);
+}
+
+.forum-home-theme__title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.forum-home-theme__title {
+  margin: 0;
+  padding: 5px 0;
+  font-family: 'Telegram HPLHS', Inter, sans-serif;
+  font-size: 26px;
+  font-weight: 400;
+  text-align: center;
+  color: #000;
+  text-shadow: none;
+  line-height: 1.2;
+}
+
+.forum-home-theme__quick-icons {
+  width: 90%;
+  max-width: 400px;
+  margin: 20px auto 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 20px;
+}
+
+.forum-home-theme__quick-icons button {
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.forum-home-theme__quick-icons img {
+  width: 35px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  filter: var(--forum-home-icon-filter);
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+/* Резюме: без «заливки» через brightness(0) — показываем исходную линейную графику */
+.forum-home-theme__quick-icons img.forum-home-icon--resume {
+  filter: none;
+}
+
+.forum-home-theme__quick-icons button:active img.forum-home-icon--resume {
+  filter: none;
+  opacity: 0.55;
+}
+
+.forum-home-theme__quick-icons button:active img:not(.forum-home-icon--resume) {
+  filter: var(--forum-home-icon-active-filter);
+}
+
+.forum-home-theme__quick-icons button:focus-visible {
+  outline: 2px solid #00a3ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.forum-home-sections {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  width: 90%;
+  max-width: 412px;
+  margin: 40px auto 0;
+}
+
+.forum-home-section-btn {
+  width: 100%;
+  margin: 0;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  color: #000 !important;
+  font-family: 'Telegram HPLHS', Inter, sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.25;
+  background-color: rgba(118, 118, 128, 0.12);
+  box-shadow: none;
+}
+
+.forum-home-section-btn:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  color: #000 !important;
+}
+
+.forum-home-section-btn:not(:disabled):active {
+  opacity: 1;
+}
+
+.forum-home-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  margin: 0;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background-color: #fff;
+  border: none;
+  border-radius: 0;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.forum-home-footer__inner {
+  width: 100%;
+  max-width: min(460px, 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+}
+
+.forum-home-footer button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.forum-home-footer img {
+  flex: 0 0 auto;
+  width: 35px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  filter: var(--forum-home-icon-filter);
+  transition: filter 0.12s ease;
+}
+
+.forum-home-footer button:active img {
+  filter: var(--forum-home-icon-active-filter);
+}
+
+.forum-home-footer button:focus-visible {
+  outline: 2px solid #00a3ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.forum-home-footer .forum-home-footer__icon--pig {
+  width: 38px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 12.1 Описание раздела / просмотр (Figma 1:12653) */
+.desc-screen {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  min-height: 100%;
+}
+
+.desc-screen__header {
+  position: relative;
+  min-height: 40px;
+  padding: 0 12px 8px;
+  background: #eeeff1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desc-screen__back {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e88d3;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.desc-screen__back-chevron {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.desc-screen__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 400;
+  text-align: center;
+  color: #000;
+  letter-spacing: -0.02em;
+  max-width: 70%;
+}
+
+.desc-screen__title--smaller {
+  font-size: 22px;
+}
+
+.desc-screen__tab-link {
+  display: inline-block;
+  margin: 12px 12px 0;
+  font-size: 16px;
+  color: #1e88d3;
+  text-decoration: none;
+}
+
+.desc-screen__tab-link:hover {
+  text-decoration: underline;
+}
+
+.desc-screen__notice {
+  margin-top: 12px;
+}
+
+.desc-screen__main {
+  flex: 1;
+  padding: 16px 16px 24px;
+}
+
+.desc-screen__prompt {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+  color: #000;
+}
+
+.desc-screen__to-edit {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 15px;
+  color: #1e88d3;
+}
+
+.desc-screen__warn {
+  margin: 8px 12px;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.desc-screen__composer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 66px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: #eeeff1;
+  box-sizing: border-box;
+}
+
+.desc-screen__composer-icon,
+.desc-screen__composer-send {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.desc-screen__composer-icon img,
+.desc-screen__composer-send img {
+  filter: var(--forum-home-icon-filter);
+}
+
+.desc-screen__composer-send:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.desc-screen__composer-send:disabled img {
+  filter: var(--forum-home-icon-filter);
+  opacity: 0.6;
+}
+
+.desc-screen__composer-input-wrap {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+}
+
+.desc-screen__composer-placeholder {
+  font-size: 16px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* 12.1.1 Редактор (Figma 1:12668), без клавиатуры в вебе */
+.desc-edit {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+
+.desc-edit__body {
+  flex: 1;
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.desc-edit__heading {
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  font-size: 18px;
+  color: #000;
+  background: transparent;
+}
+
+.desc-edit__textarea {
+  width: 100%;
+  flex: 1;
+  min-height: 200px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1.45;
+  resize: vertical;
+  box-shadow: none;
+}
+
+.desc-edit__toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: #f5f5f5;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.desc-edit__tool {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #000;
+}
+
+.desc-edit__tool-sep {
+  color: rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+.desc-edit__publish {
+  margin-left: auto;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #1e88d3;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.desc-edit__publish:active {
+  opacity: 0.9;
+}
+
+/* 14.1 + 14.3 Темы модули (Figma 1:9996, 1:10015) */
+.theme-module-page__top {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 12px;
+}
+
+.theme-module-page__back {
+  justify-self: start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e88d3;
+  cursor: pointer;
+}
+
+.theme-module-page__screen-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.theme-module-page__notice {
+  margin-bottom: 8px;
+}
+
+.theme-module {
+  margin-top: 8px;
+  padding-bottom: 24px;
+}
+
+.theme-module__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px 10px;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.theme-module__head-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #000;
+}
+
+.theme-module__chevron {
+  font-size: 12px;
+  color: #333;
+}
+
+.theme-module__list {
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+}
+
+.theme-module__list li {
+  margin-bottom: 6px;
+}
+
+.theme-module__list-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: #1976d2;
+  text-decoration: underline;
+  cursor: pointer;
+  text-align: left;
+}
+
+.theme-module__list-meta {
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+  text-decoration: none;
+}
+
+.theme-module__form {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.theme-module__input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.23);
+  border-radius: 4px;
+  font-size: 16px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.theme-module__submit {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background: #d9d9d9;
+  color: #333;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.theme-module__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.theme-module__error {
+  margin: 0;
+  font-size: 14px;
+  color: #b42318;
 }
 
 .hero-panel {

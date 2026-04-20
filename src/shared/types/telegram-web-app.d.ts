@@ -19,6 +19,14 @@ declare global {
     link_color?: string
   }
 
+  interface TelegramBackButton {
+    isVisible: boolean
+    show: () => TelegramBackButton
+    hide: () => TelegramBackButton
+    onClick: (callback: () => void) => TelegramBackButton
+    offClick: (callback: () => void) => TelegramBackButton
+  }
+
   interface TelegramWebApp {
     initData: string
     initDataUnsafe?: {
@@ -27,6 +35,8 @@ declare global {
     themeParams: TelegramThemeParams
     ready: () => void
     expand: () => void
+    close: () => void
+    BackButton: TelegramBackButton
   }
 
   interface Window {

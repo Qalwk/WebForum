@@ -5,6 +5,9 @@ export function SessionStatusBar() {
   const { token, authStatus, authError, isTelegram, setToken, clearToken } =
     useSession()
   const [draftToken, setDraftToken] = useState(token)
+  const isLocalHost =
+    typeof window !== 'undefined' &&
+    ['localhost', '127.0.0.1'].includes(window.location.hostname)
 
   const isConfigured = Boolean(token)
 
@@ -12,7 +15,7 @@ export function SessionStatusBar() {
     setDraftToken(token)
   }, [token])
 
-  if (isTelegram && authStatus === 'ready') {
+  if (isTelegram || !isLocalHost) {
     return null
   }
 
@@ -24,7 +27,9 @@ export function SessionStatusBar() {
         </p>
         <p className="session-bar__text">
           {isTelegram
-            ? authStatus === 'authenticating'
+            ? authStatus === 'checking_telegram'
+              ? 'Жду Telegram WebApp и initDataRaw от контейнера Mini App.'
+              : authStatus === 'authenticating'
               ? 'Пробую авторизоваться через initDataRaw от Telegram.'
               : authError || 'Mini App запущен внутри Telegram.'
             : isConfigured

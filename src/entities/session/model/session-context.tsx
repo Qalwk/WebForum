@@ -3,16 +3,30 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react'
 import { DEFAULT_API_TOKEN } from '../../../shared/config/env'
-import { initTelegramWebAppAppearance, isTelegramMiniApp, getTelegramInitDataRaw } from '../../../shared/lib/telegram-web-app'
+import {
+  ensureTelegramScriptLoaded,
+  isLikelyTelegramUserAgent,
+  tryCaptureTelegramSession,
+  waitForTelegramInitData,
+} from '../../../shared/lib/telegram-web-app'
 import { authByTelegram } from '../api/auth-api'
 
 const SESSION_STORAGE_KEY = 'webforum_access_token'
+const TELEGRAM_BOOT_DELAY_MS = 250
+const TELEGRAM_BOOT_ATTEMPTS_BROWSER = 28
+const TELEGRAM_BOOT_ATTEMPTS_TG_UA = 80
 
-type AuthStatus = 'idle' | 'authenticating' | 'ready' | 'error'
+type AuthStatus =
+  | 'checking_telegram'
+  | 'idle'
+  | 'authenticating'
+  | 'ready'
+  | 'error'
 
 type SessionContextValue = {
   token: string
@@ -36,27 +50,97 @@ function getInitialToken() {
 export function SessionProvider({ children }: PropsWithChildren) {
   const [token, setTokenState] = useState(getInitialToken)
   const [authStatus, setAuthStatus] = useState<AuthStatus>(
-    getInitialToken() ? 'ready' : 'idle',
+    getInitialToken() ? 'ready' : 'checking_telegram',
   )
   const [authError, setAuthError] = useState('')
   const [isTelegram, setIsTelegram] = useState(false)
+  const [telegramInitDataRaw, setTelegramInitDataRaw] = useState('')
+
+  const tokenRef = useRef(token)
+  tokenRef.current = token
 
   useEffect(() => {
-    const isTelegramApp = initTelegramWebAppAppearance()
-    setIsTelegram(isTelegramApp)
-  }, [])
+    let cancelled = false
+
+    function finishAsBrowserMode() {
+      setIsTelegram(false)
+      setTelegramInitDataRaw('')
+      setAuthError('')
+      setAuthStatus(tokenRef.current ? 'ready' : 'idle')
+    }
+
+    async function runTelegramBoot() {
+      const activeToken = tokenRef.current
+
+      if (activeToken) {
+        setAuthStatus('ready')
+        await ensureTelegramScriptLoaded()
+        if (cancelled) {
+          return
+        }
+
+        const snapshot = tryCaptureTelegramSession()
+        if (snapshot.webAppOk) {
+          setIsTelegram(true)
+        }
+
+        return
+      }
+
+      setAuthStatus('checking_telegram')
+      setAuthError('')
+
+      await ensureTelegramScriptLoaded()
+      if (cancelled) {
+        return
+      }
+
+      const maxAttempts = isLikelyTelegramUserAgent()
+        ? TELEGRAM_BOOT_ATTEMPTS_TG_UA
+        : TELEGRAM_BOOT_ATTEMPTS_BROWSER
+
+      const result = await waitForTelegramInitData({
+        maxAttempts,
+        delayMs: TELEGRAM_BOOT_DELAY_MS,
+        cancelled: () => cancelled,
+      })
+
+      if (cancelled) {
+        return
+      }
+
+      if (result.webAppOk) {
+        setIsTelegram(true)
+      }
+
+      if (result.initDataRaw) {
+        setTelegramInitDataRaw(result.initDataRaw)
+        return
+      }
+
+      if (result.webAppOk) {
+        setAuthStatus('error')
+        setAuthError(
+          'Telegram Mini App найден, но initData не пришёл. Закройте мини-приложение и откройте снова кнопкой Web App у бота (не из превью ссылки).',
+        )
+        return
+      }
+
+      finishAsBrowserMode()
+    }
+
+    void runTelegramBoot()
+
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   useEffect(() => {
     let isMounted = true
 
     async function runTelegramAuth() {
-      if (token || !isTelegramMiniApp()) {
-        return
-      }
-
-      const initDataRaw = getTelegramInitDataRaw()
-
-      if (!initDataRaw) {
+      if (token || !telegramInitDataRaw) {
         return
       }
 
@@ -64,7 +148,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       setAuthError('')
 
       try {
-        const response = await authByTelegram(initDataRaw)
+        const response = await authByTelegram(telegramInitDataRaw)
 
         if (!isMounted) {
           return
@@ -91,7 +175,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return () => {
       isMounted = false
     }
-  }, [token])
+  }, [telegramInitDataRaw, token])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -119,7 +203,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       },
       clearToken: () => {
         setTokenState('')
-        setAuthStatus('idle')
+        setAuthStatus(isTelegram ? 'error' : 'idle')
         setAuthError('')
       },
     }),
