@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config/env'
 
 type RequestOptions = {
-  method?: 'GET' | 'POST'
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT'
   token?: string
   body?: unknown
 }
@@ -59,10 +59,52 @@ export async function requestJson<T>(
     method,
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
+      /* Только при теле: на GET с Content-Type: application/json часть прокси/серверов даёт сбой. */
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
+  })
+
+  const text = await response.text()
+  let payload: unknown = null
+
+  if (text) {
+    try {
+      payload = JSON.parse(text) as unknown
+    } catch {
+      payload = text
+    }
+  }
+
+  if (!response.ok) {
+    throw new HttpError(
+      messageFromApiPayload(payload, response.status),
+      response.status,
+      payload,
+    )
+  }
+
+  return payload as T
+}
+
+/**
+ * Multipart: не задаём Content-Type, чтобы браузер проставил boundary.
+ */
+export async function requestFormDataJson<T>(
+  path: string,
+  formData: FormData,
+  options: { method?: 'POST' | 'PATCH'; token?: string } = {},
+): Promise<T> {
+  const { method = 'POST', token } = options
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
   })
 
   const text = await response.text()

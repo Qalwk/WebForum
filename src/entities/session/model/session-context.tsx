@@ -10,7 +10,7 @@ import {
 import { DEFAULT_API_TOKEN } from '../../../shared/config/env'
 import {
   ensureTelegramScriptLoaded,
-  isLikelyTelegramUserAgent,
+  isTelegramClientHint,
   tryCaptureTelegramSession,
   waitForTelegramInitData,
 } from '../../../shared/lib/telegram-web-app'
@@ -18,8 +18,8 @@ import { authByTelegram } from '../api/auth-api'
 
 const SESSION_STORAGE_KEY = 'webforum_access_token'
 const TELEGRAM_BOOT_DELAY_MS = 250
-const TELEGRAM_BOOT_ATTEMPTS_BROWSER = 28
-const TELEGRAM_BOOT_ATTEMPTS_TG_UA = 80
+/** Достаточно долго и для WebView без «Telegram» в UA (иногда шьёт обычный Chrome UA). */
+const TELEGRAM_BOOT_MAX_ATTEMPTS = 96
 
 type AuthStatus =
   | 'checking_telegram'
@@ -41,10 +41,15 @@ const SessionContext = createContext<SessionContextValue | null>(null)
 
 function getInitialToken() {
   if (typeof window === 'undefined') {
-    return DEFAULT_API_TOKEN
+    return DEFAULT_API_TOKEN.trim()
   }
 
-  return window.localStorage.getItem(SESSION_STORAGE_KEY) ?? DEFAULT_API_TOKEN
+  const stored = window.localStorage.getItem(SESSION_STORAGE_KEY)
+  if (stored !== null && stored.trim() !== '') {
+    return stored.trim()
+  }
+
+  return DEFAULT_API_TOKEN.trim()
 }
 
 export function SessionProvider({ children }: PropsWithChildren) {
@@ -95,12 +100,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
         return
       }
 
-      const maxAttempts = isLikelyTelegramUserAgent()
-        ? TELEGRAM_BOOT_ATTEMPTS_TG_UA
-        : TELEGRAM_BOOT_ATTEMPTS_BROWSER
-
       const result = await waitForTelegramInitData({
-        maxAttempts,
+        maxAttempts: TELEGRAM_BOOT_MAX_ATTEMPTS,
         delayMs: TELEGRAM_BOOT_DELAY_MS,
         cancelled: () => cancelled,
       })
@@ -109,7 +110,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         return
       }
 
-      if (result.webAppOk) {
+      if (result.webAppOk || result.initDataRaw) {
         setIsTelegram(true)
       }
 
@@ -122,6 +123,15 @@ export function SessionProvider({ children }: PropsWithChildren) {
         setAuthStatus('error')
         setAuthError(
           'Telegram Mini App найден, но initData не пришёл. Закройте мини-приложение и откройте снова кнопкой Web App у бота (не из превью ссылки).',
+        )
+        return
+      }
+
+      if (isTelegramClientHint()) {
+        setIsTelegram(true)
+        setAuthStatus('error')
+        setAuthError(
+          'Не удалось получить initData (ни из WebApp, ни из tgWebAppData в адресе). Откройте мини-приложение кнопкой у бота, обновите Telegram; не открывайте голую ссылку вне Web App.',
         )
         return
       }
@@ -203,7 +213,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
       },
       clearToken: () => {
         setTokenState('')
-        setAuthStatus(isTelegram ? 'error' : 'idle')
+        // После сброса (в т.ч. из-за 401) сразу пойдёт повторный boot по token — не вешаем error заранее
+        setAuthStatus('idle')
         setAuthError('')
       },
     }),

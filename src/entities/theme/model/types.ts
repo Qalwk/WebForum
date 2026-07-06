@@ -10,9 +10,20 @@ export type Theme = {
   updated_at: string
 }
 
-export type ThemeSection = {
+/** Строки из ответа секции: типы сообщений и флаги (см. message_types API). */
+export type SectionMessageTypeRule = {
   section_id: string
+  message_type: string
+  allow_comments: boolean
+}
+
+export type ThemeSection = {
+  /** В API может приходить как `id`. */
+  section_id: string
+  /** В API может приходить как `code`. */
   section_code: string
+  /** Опционально: правила постов/задач по типам для этой секции. */
+  message_types?: SectionMessageTypeRule[]
 }
 
 export type ThemeWithSections = {

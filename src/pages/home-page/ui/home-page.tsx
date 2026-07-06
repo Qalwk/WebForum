@@ -1,14 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom'
 import {
   getRootTheme,
   getThemeById,
   getThemeSections,
 } from '../../../entities/theme/api/theme-api'
 import { getSectionMeta } from '../../../entities/theme/lib/section-meta'
+import {
+  getSectionRouteKind,
+  IKR_SUBSECTION_CODES,
+  pathToPostChat,
+  pathToTaskChat,
+  type IkrSubsectionCode,
+} from '../../../entities/theme/lib/section-routing'
+import {
+  fetchIkrSubsectionsFilled,
+  isIkrBlockComplete,
+  type IkrSubsectionFilled,
+} from '../../../entities/theme/lib/ikr-ui'
 import { getKnownThemeIds, saveKnownThemeIds } from '../../../entities/theme/model/theme-catalog'
 import type { Theme, ThemeSection, ThemeWithSections } from '../../../entities/theme/model/types'
 import { useSession } from '../../../entities/session/model/session-context'
+import { HttpError } from '../../../shared/api/http-client'
 import { PageState } from '../../../shared/ui/page-state'
 import { getTelegramWebApp } from '../../../shared/lib/telegram-web-app'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
@@ -20,7 +33,7 @@ import iconBackImg from '../../../assets/home-legacy/back.webp'
 import iconTimeImg from '../../../assets/home-legacy/time.webp'
 import iconPautineImg from '../../../assets/home-legacy/pautineSimple.webp'
 import iconMessengerImg from '../../../assets/home-legacy/messangerSimple.webp'
-import resumeRowImg from '../../../assets/home-legacy/resumeUser.png'
+import resumeRowImg from '../../../assets/home-legacy/resume.webp'
 import footerPigImg from '../../../assets/home-legacy/pigSimple.webp'
 import footerHeadImg from '../../../assets/home-legacy/headSimple.webp'
 import footerTypewriterImg from '../../../assets/home-legacy/typewriterSimple.webp'
@@ -29,35 +42,64 @@ import footerMicroscopeImg from '../../../assets/home-legacy/microscopeSimple.we
 
 type LoadState = 'idle' | 'loading' | 'error' | 'ready'
 
-const HOME_SECTION_ORDER = [
-  'experience_exchange',
-  'description',
-  'perfect_result',
-  'project_modules',
-] as const
-
 const HOME_BUTTON_LABEL: Record<string, string> = {
   experience_exchange: 'Обмен опытом',
   description: 'Описание',
-  perfect_result: 'Идеальный результат',
+  perfect_result: 'ИКР',
   project_modules: 'Модули проекта',
 }
 
-function sortSectionsForHome(sections: ThemeSection[]): ThemeSection[] {
-  const byCode = new Map(sections.map((s) => [s.section_code, s]))
-  const ordered: ThemeSection[] = []
-  for (const code of HOME_SECTION_ORDER) {
-    const section = byCode.get(code)
-    if (section) {
-      ordered.push(section)
-    }
+type NavigateSectionParams = {
+  theme: { id: string; title: string }
+  sections: ThemeSection[]
+  sectionCode: string
+  navigate: NavigateFunction
+  setIkrOpen: Dispatch<SetStateAction<Record<string, boolean>>>
+}
+
+function navigateToSection(p: NavigateSectionParams) {
+  const { theme, sections, sectionCode, navigate, setIkrOpen } = p
+  const app = getTelegramWebApp()
+  const kind = getSectionRouteKind(sectionCode)
+  if (!kind) {
+    app?.showAlert?.(`Код «${sectionCode}» не поддержан в приложении.`)
+    return
   }
-  for (const section of sections) {
-    if (!HOME_SECTION_ORDER.includes(section.section_code as (typeof HOME_SECTION_ORDER)[number])) {
-      ordered.push(section)
-    }
+  if (kind === 'ikr_group') {
+    setIkrOpen((prev) => ({
+      ...prev,
+      [theme.id]: !prev[theme.id],
+    }))
+    return
   }
-  return ordered
+
+  const row = sections.find((s) => s.section_code === sectionCode)
+  if (!row) {
+    const title = getSectionMeta(sectionCode).title
+    app?.showAlert?.(
+      `Секция «${title}» не пришла с сервера. Обновите список или проверьте тему в админке.`,
+    )
+    return
+  }
+
+  const state = { themeTitle: theme.title, sectionCode }
+
+  if (kind === 'description') {
+    navigate(`/themes/${theme.id}/description`, { state })
+    return
+  }
+  if (kind === 'project_modules') {
+    navigate('/themes/manage')
+    return
+  }
+  if (kind === 'post_messages') {
+    navigate(pathToPostChat(theme.id, row.section_id), { state })
+    return
+  }
+  if (kind === 'task_messages') {
+    navigate(pathToTaskChat(theme.id, row.section_id), { state })
+    return
+  }
 }
 
 const FALLBACK_THEME: ThemeWithSections = {
@@ -105,15 +147,33 @@ async function loadKnownThemes(token: string): Promise<ThemeWithSections[]> {
   )
 }
 
+function isTokenExpiredError(error: unknown) {
+  if (error instanceof HttpError) {
+    if (error.status === 401) {
+      return true
+    }
+  }
+  const message = error instanceof Error ? error.message : String(error)
+  return /expired|истёк|истек/i.test(message)
+}
+
 export function HomePage() {
   const navigate = useNavigate()
-  const { token, authStatus, authError, isTelegram } = useSession()
+  const { search: locationSearch, hash: locationHash } = useLocation()
+  const { token, authStatus, authError, isTelegram, clearToken } = useSession()
   useTelegramBackButton(false, () => {})
   const [search, setSearch] = useState('')
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [themes, setThemes] = useState<ThemeWithSections[]>([])
   const [reloadKey, setReloadKey] = useState(0)
+  const [ikrOpenByTheme, setIkrOpenByTheme] = useState<Record<string, boolean>>(
+    {},
+  )
+  /** Заполненность трёх подвкладок ИКР (посты через GET …/posts). */
+  const [ikrFilledByTheme, setIkrFilledByTheme] = useState<
+    Record<string, IkrSubsectionFilled | undefined>
+  >({})
 
   useEffect(() => {
     let isMounted = true
@@ -136,6 +196,13 @@ export function HomePage() {
           return
         }
 
+        if (isTokenExpiredError(error)) {
+          clearToken()
+          setLoadState('idle')
+          setErrorMessage('')
+          return
+        }
+
         setLoadState('error')
         setErrorMessage(
           error instanceof Error
@@ -154,22 +221,63 @@ export function HomePage() {
     }
   }, [reloadKey, token])
 
-  const filteredThemes = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase()
-    const sourceThemes = themes.length > 0 ? themes : [FALLBACK_THEME]
-
-    if (!normalizedSearch) {
-      return sourceThemes
+  useEffect(() => {
+    if (!token || loadState !== 'ready') {
+      return
     }
 
-    return sourceThemes.filter((item) =>
+    let cancelled = false
+
+    async function fillIkr() {
+      try {
+        const next: Record<string, IkrSubsectionFilled | undefined> = {}
+        await Promise.all(
+          themes.map(async ({ theme: t, sections }) => {
+            try {
+              const fill = await fetchIkrSubsectionsFilled(t.id, sections, token)
+              next[t.id] = fill
+            } catch {
+              next[t.id] = undefined
+            }
+          }),
+        )
+        if (!cancelled) {
+          setIkrFilledByTheme(next)
+        }
+      } catch {
+        //
+      }
+    }
+
+    void fillIkr()
+    return () => {
+      cancelled = true
+    }
+  }, [token, themes, loadState])
+
+  const rootThemeEntry = useMemo(() => {
+    const sourceThemes = themes.length > 0 ? themes : [FALLBACK_THEME]
+    return (
+      sourceThemes.find((item) => item.theme.parent_id === null) ?? sourceThemes[0]
+    )
+  }, [themes])
+
+  const filteredThemes = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase()
+    const displayThemes = rootThemeEntry ? [rootThemeEntry] : [FALLBACK_THEME]
+
+    if (!normalizedSearch) {
+      return displayThemes
+    }
+
+    return displayThemes.filter((item) =>
       item.theme.title.toLowerCase().includes(normalizedSearch),
     )
-  }, [search, themes])
+  }, [search, rootThemeEntry])
 
   const notice = useMemo(() => {
     if (authStatus === 'checking_telegram') {
-      return 'Подключаю Telegram Mini App. Если Telegram передаст initDataRaw, данные подтянутся автоматически.'
+      return 'Подключаю Telegram Mini App и жду initData…'
     }
 
     if (authStatus === 'authenticating') {
@@ -218,7 +326,18 @@ export function HomePage() {
           <button className="forum-home-toolbar__icon-btn" type="button" aria-label="Поделиться">
             <img src={shareImg} alt="" width={32} height={32} />
           </button>
-          <button className="forum-home-toolbar__icon-btn" type="button" aria-label="Уведомления">
+          <button
+            className="forum-home-toolbar__icon-btn"
+            type="button"
+            aria-label="Уведомления"
+            onClick={() => {
+              navigate({
+                pathname: '/notifications',
+                search: locationSearch,
+                hash: locationHash,
+              })
+            }}
+          >
             <img src={bellImg} alt="" width={32} height={32} />
           </button>
         </div>
@@ -250,7 +369,30 @@ export function HomePage() {
       ) : (
         <>
           {filteredThemes.map(({ theme, sections }) => {
-            const ordered = sortSectionsForHome(sections)
+            const byCode = new Map(sections.map((s) => [s.section_code, s]))
+            const ikrOpen = ikrOpenByTheme[theme.id] ?? false
+            const footerTheme = rootThemeEntry?.theme ?? theme
+            const footerSections = rootThemeEntry?.sections ?? sections
+
+            function go(code: string) {
+              navigateToSection({
+                theme: footerTheme,
+                sections: footerSections,
+                sectionCode: code,
+                navigate,
+                setIkrOpen: setIkrOpenByTheme,
+              })
+            }
+
+            function goSectionForCard(code: string) {
+              navigateToSection({
+                theme,
+                sections,
+                sectionCode: code,
+                navigate,
+                setIkrOpen: setIkrOpenByTheme,
+              })
+            }
 
             return (
               <section className="forum-home-theme" key={theme.id}>
@@ -274,7 +416,13 @@ export function HomePage() {
                   <button type="button" aria-label="Структура">
                     <img src={iconPautineImg} alt="" />
                   </button>
-                  <button type="button" aria-label="Сообщения">
+                  <button
+                    type="button"
+                    aria-label="Обсуждения"
+                    onClick={() => {
+                      goSectionForCard('discussion')
+                    }}
+                  >
                     <img src={iconMessengerImg} alt="" />
                   </button>
                   <button type="button" aria-label="Резюме">
@@ -287,64 +435,147 @@ export function HomePage() {
                 </div>
 
                 <div className="forum-home-sections">
-                  {ordered.map((section) => {
-                    const meta = getSectionMeta(section.section_code)
-                    const label =
-                      HOME_BUTTON_LABEL[section.section_code] ?? meta.title
-                    const isDescription = section.section_code === 'description'
-                    const isThemeModule = section.section_code === 'project_modules'
-                    const isImplemented = isDescription || isThemeModule
-
-                    return (
-                      <button
-                        key={section.section_id}
-                        type="button"
-                        className="forum-home-section-btn"
-                        disabled={!isImplemented}
-                        onClick={() => {
-                          if (isDescription) {
-                            navigate(`/themes/${theme.id}/description`, {
-                              state: { themeTitle: theme.title },
-                            })
-                            return
+                  {byCode.get('experience_exchange') ? (
+                    <button
+                      type="button"
+                      className="forum-home-section-btn forum-home-section-btn--experience"
+                      onClick={() => {
+                        goSectionForCard('experience_exchange')
+                      }}
+                    >
+                      {HOME_BUTTON_LABEL.experience_exchange}
+                    </button>
+                  ) : null}
+                  {byCode.get('description') ? (
+                    <button
+                      type="button"
+                      className="forum-home-section-btn"
+                      onClick={() => {
+                        goSectionForCard('description')
+                      }}
+                    >
+                      {HOME_BUTTON_LABEL.description}
+                    </button>
+                  ) : null}
+                  {byCode.get('perfect_result') ? (
+                    <button
+                      type="button"
+                      className={[
+                        'forum-home-section-btn forum-home-section-btn--ikr-main',
+                        (() => {
+                          const fill = ikrFilledByTheme[theme.id]
+                          if (!fill) {
+                            return 'forum-home-section-btn--ikr-accent'
                           }
-                          if (isThemeModule) {
-                            navigate('/themes/manage')
-                          }
-                        }}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
+                          return isIkrBlockComplete(fill)
+                            ? 'forum-home-section-btn--ikr-filled'
+                            : 'forum-home-section-btn--ikr-accent'
+                        })(),
+                      ]
+                        .join(' ')
+                        .trim()}
+                      onClick={() => {
+                        goSectionForCard('perfect_result')
+                      }}
+                    >
+                      {HOME_BUTTON_LABEL.perfect_result}
+                      {ikrOpen ? ' ▲' : ' ▼'}
+                    </button>
+                  ) : null}
+                  {ikrOpen
+                    ? IKR_SUBSECTION_CODES.map((code) => {
+                        if (!byCode.get(code)) {
+                          return null
+                        }
+                        const fill = ikrFilledByTheme[theme.id]
+                        const subsectionFilled =
+                          fill?.[code as IkrSubsectionCode] ?? false
+                        const subCls = subsectionFilled
+                          ? 'forum-home-section-btn forum-home-section-btn--sub forum-home-section-btn--sub-ikr forum-home-section-btn--ikr-sub-filled'
+                          : 'forum-home-section-btn forum-home-section-btn--sub forum-home-section-btn--sub-ikr forum-home-section-btn--ikr-accent'
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            className={subCls}
+                            onClick={() => {
+                              goSectionForCard(code)
+                            }}
+                          >
+                            {getSectionMeta(code).title}
+                          </button>
+                        )
+                      })
+                    : null}
+                  {byCode.get('project_modules') ? (
+                    <button
+                      type="button"
+                      className="forum-home-section-btn"
+                      onClick={() => {
+                        goSectionForCard('project_modules')
+                      }}
+                    >
+                      {HOME_BUTTON_LABEL.project_modules}
+                    </button>
+                  ) : null}
                 </div>
+
+                <footer className="forum-home-footer" aria-label="Нижняя панель">
+                  <div className="forum-home-footer__inner">
+                    <button
+                      type="button"
+                      aria-label="Копилка идей"
+                      onClick={() => {
+                        go('chat_ideas')
+                      }}
+                    >
+                      <img
+                        className="forum-home-footer__icon--pig"
+                        src={footerPigImg}
+                        alt=""
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Чат вопросов"
+                      onClick={() => {
+                        go('chat_qa')
+                      }}
+                    >
+                      <img src={footerHeadImg} alt="" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Чат публикаций"
+                      onClick={() => {
+                        go('chat_publications')
+                      }}
+                    >
+                      <img src={footerTypewriterImg} alt="" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Чат задач"
+                      onClick={() => {
+                        go('chat_tasks')
+                      }}
+                    >
+                      <img src={footerGearImg} alt="" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Лаборатория экспериментов"
+                      onClick={() => {
+                        go('chat_experiments')
+                      }}
+                    >
+                      <img src={footerMicroscopeImg} alt="" />
+                    </button>
+                  </div>
+                </footer>
               </section>
             )
           })}
-
-          <footer className="forum-home-footer" aria-label="Нижняя панель">
-            <div className="forum-home-footer__inner">
-              <button type="button" aria-label="Копилка">
-                <img
-                  className="forum-home-footer__icon--pig"
-                  src={footerPigImg}
-                  alt=""
-                />
-              </button>
-              <button type="button" aria-label="Вопросы">
-                <img src={footerHeadImg} alt="" />
-              </button>
-              <button type="button" aria-label="Публикации">
-                <img src={footerTypewriterImg} alt="" />
-              </button>
-              <button type="button" aria-label="Задачи">
-                <img src={footerGearImg} alt="" />
-              </button>
-              <button type="button" aria-label="Лаборатория">
-                <img src={footerMicroscopeImg} alt="" />
-              </button>
-            </div>
-          </footer>
         </>
       )}
     </div>

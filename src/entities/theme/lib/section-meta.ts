@@ -21,24 +21,24 @@ const SECTION_META: Record<string, SectionMeta> = {
     actionLabel: 'Открыть описание',
   },
   perfect_result: {
-    title: 'Идеальный результат',
-    description: 'Верхний раздел для ИКР-сценариев и связанных материалов.',
-    actionLabel: 'Скоро',
+    title: 'ИКР',
+    description: 'Создание и моделирование проектных решений по ТРИЗ (желаемый / тех. моделирование / нежелательные эффекты).',
+    actionLabel: 'Открыть',
   },
   desirable_effects: {
-    title: 'Желаемые эффекты',
-    description: 'Дочерний раздел идеального результата.',
-    actionLabel: 'Скоро',
+    title: 'Желаемый эффект',
+    description: 'Формулировка целевого эффекта в функциях системы.',
+    actionLabel: 'Открыть',
   },
   technical_modeling: {
     title: 'Техническое моделирование',
-    description: 'Дочерний раздел идеального результата.',
-    actionLabel: 'Скоро',
+    description: 'Описание модели решения; без реакций лайк/дизлайк.',
+    actionLabel: 'Открыть',
   },
   undesirable_effects: {
     title: 'Нежелательные эффекты',
-    description: 'Дочерний раздел идеального результата.',
-    actionLabel: 'Скоро',
+    description: 'Обсуждение: каждый комментарий — один нежелательный эффект.',
+    actionLabel: 'Открыть',
   },
   project_modules: {
     title: 'Модули проекта',
@@ -62,13 +62,13 @@ const SECTION_META: Record<string, SectionMeta> = {
   },
   chat_tasks: {
     title: 'Чат задач',
-    description: 'Задачи и назначения исполнителей.',
-    actionLabel: 'Скоро',
+    description: 'Постановка задач, заявки исполнителей и коэффициенты.',
+    actionLabel: 'Открыть',
   },
   chat_experiments: {
     title: 'Лаборатория экспериментов',
-    description: 'Эксперименты и исследовательские задачи.',
-    actionLabel: 'Скоро',
+    description: 'Публикации экспериментов (отдельно от чата задач).',
+    actionLabel: 'Открыть',
   },
 }
 

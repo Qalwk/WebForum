@@ -17,7 +17,7 @@ export function SectionDescriptionEditPage() {
   const [themeTitle, setThemeTitle] = useState(
     (location.state as EditLocationState | null)?.themeTitle ?? '',
   )
-  const [heading, setHeading] = useState('[Заголовок раздела]')
+  const [heading, setHeading] = useState('')
   const [body, setBody] = useState('')
   const [loadError, setLoadError] = useState('')
 
@@ -27,6 +27,7 @@ export function SectionDescriptionEditPage() {
     }
     navigate(`/themes/${themeId}/description`, {
       state: { themeTitle: themeTitle || undefined },
+      replace: true,
     })
   })
 
@@ -70,6 +71,7 @@ export function SectionDescriptionEditPage() {
   function handlePublish() {
     navigate(`/themes/${themeId}/description`, {
       state: { themeTitle: themeTitle || undefined },
+      replace: true,
     })
   }
 
@@ -79,9 +81,12 @@ export function SectionDescriptionEditPage() {
         <button
           className="desc-screen__back"
           type="button"
-          onClick={() => navigate(`/themes/${themeId}/description`, {
-            state: { themeTitle: themeTitle || undefined },
-          })}
+          onClick={() =>
+            navigate(`/themes/${themeId}/description`, {
+              state: { themeTitle: themeTitle || undefined },
+              replace: true,
+            })
+          }
         >
           <span className="desc-screen__back-chevron" aria-hidden>
             ‹
@@ -108,6 +113,7 @@ export function SectionDescriptionEditPage() {
           onChange={(event) => {
             setHeading(event.target.value)
           }}
+          placeholder="Заголовок раздела"
           autoComplete="off"
         />
         <label className="visually-hidden" htmlFor="desc-body">
@@ -125,25 +131,7 @@ export function SectionDescriptionEditPage() {
         />
       </div>
 
-      <div className="desc-edit__toolbar" role="toolbar" aria-label="Форматирование">
-        <button type="button" className="desc-edit__tool" aria-label="Жирный">
-          B
-        </button>
-        <button type="button" className="desc-edit__tool" aria-label="Курсив">
-          З
-        </button>
-        <button type="button" className="desc-edit__tool" aria-label="Подчёркивание">
-          A
-        </button>
-        <span className="desc-edit__tool-sep" aria-hidden>
-          |
-        </span>
-        <button type="button" className="desc-edit__tool" aria-label="Ссылка">
-          🔗
-        </button>
-        <button type="button" className="desc-edit__tool" aria-label="Вложение">
-          📎
-        </button>
+      <div className="desc-edit__toolbar" role="group" aria-label="Публикация">
         <button
           type="button"
           className="desc-edit__publish"

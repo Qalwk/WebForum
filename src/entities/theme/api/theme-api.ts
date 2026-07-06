@@ -1,4 +1,5 @@
 import { requestJson } from '../../../shared/api/http-client'
+import { normalizeThemeSection } from '../lib/normalize-theme-section'
 import type {
   CreateThemePayload,
   Theme,
@@ -17,8 +18,14 @@ export function getThemeById(themeId: string, token: string) {
   return requestJson<Theme>(`/themes/${themeId}`, { token })
 }
 
-export function getThemeSections(themeId: string, token: string) {
-  return requestJson<ThemeSection[]>(`/themes/${themeId}/sections`, { token })
+export async function getThemeSections(themeId: string, token: string) {
+  const rows = await requestJson<unknown>(`/themes/${themeId}/sections`, {
+    token,
+  })
+  if (!Array.isArray(rows)) {
+    return []
+  }
+  return rows.map((row): ThemeSection => normalizeThemeSection(row))
 }
 
 export async function createTheme(payload: CreateThemePayload, token: string) {

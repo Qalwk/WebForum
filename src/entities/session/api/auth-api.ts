@@ -1,50 +1,27 @@
 import { API_BASE_URL } from '../../../shared/config/env'
+import { HttpError } from '../../../shared/api/http-client'
+import {
+  getAuthErrorMessage,
+  parseAuthErrorPayload,
+} from '../lib/parse-auth-error'
+import type {
+  AuthTokensResponse,
+  LoginByEmailRequest,
+  RegisterByEmailRequest,
+} from '../model/auth-types'
 
-type TelegramAuthResponse = {
-  access_token: string
-  refresh_token: string | null
-}
-
-function messageFromAuthPayload(payload: unknown): string {
-  const fallback = 'Не удалось авторизоваться через Telegram Mini App.'
-
-  if (typeof payload === 'object' && payload && 'message' in payload) {
-    const message = (payload as { message: unknown }).message
-    if (typeof message === 'string' && message.trim()) {
-      return message
-    }
-  }
-
-  if (typeof payload !== 'object' || !payload || !('detail' in payload)) {
-    return fallback
-  }
-
-  const detail = (payload as { detail: unknown }).detail
-
-  if (typeof detail === 'string') {
-    return detail
-  }
-
-  if (Array.isArray(detail) && detail.length > 0) {
-    const first = detail[0]
-    if (typeof first === 'object' && first && 'msg' in first) {
-      return String((first as { msg: unknown }).msg)
-    }
-  }
-
-  return fallback
-}
-
-export async function authByTelegram(initDataRaw: string) {
-  const response = await fetch(`${API_BASE_URL}/auth/telegram`, {
+async function postAuthJson<T>(
+  path: string,
+  body: unknown,
+  context: 'login' | 'register',
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      init_data: initDataRaw,
-    }),
+    body: JSON.stringify(body),
   })
 
   const text = await response.text()
@@ -58,13 +35,39 @@ export async function authByTelegram(initDataRaw: string) {
     }
   }
 
-  if (!response.ok || !payload || typeof payload !== 'object') {
-    throw new Error(messageFromAuthPayload(payload))
+  if (!response.ok) {
+    throw new HttpError(
+      parseAuthErrorPayload(payload, response.status, context),
+      response.status,
+      payload,
+    )
   }
 
-  if (!('access_token' in payload)) {
-    throw new Error(messageFromAuthPayload(payload))
+  if (!payload || typeof payload !== 'object') {
+    throw new HttpError(
+      getAuthErrorMessage(null, context),
+      response.status,
+      payload,
+    )
   }
 
-  return payload as TelegramAuthResponse
+  return payload as T
+}
+
+export function authByTelegram(initDataRaw: string) {
+  return postAuthJson<AuthTokensResponse>(
+    '/auth/telegram',
+    { init_data: initDataRaw },
+    'login',
+  )
+}
+
+/** OpenAPI: POST /api/v1/auth/login */
+export function loginByEmail(body: LoginByEmailRequest) {
+  return postAuthJson<AuthTokensResponse>('/auth/login', body, 'login')
+}
+
+/** OpenAPI: POST /api/v1/auth/register (201) */
+export function registerByEmail(body: RegisterByEmailRequest) {
+  return postAuthJson<AuthTokensResponse>('/auth/register', body, 'register')
 }

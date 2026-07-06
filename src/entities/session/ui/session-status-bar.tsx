@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSession } from '../model/session-context'
 
 export function SessionStatusBar() {
+  const navigate = useNavigate()
   const { token, authStatus, authError, isTelegram, setToken, clearToken } =
     useSession()
   const [draftToken, setDraftToken] = useState(token)
@@ -55,17 +57,40 @@ export function SessionStatusBar() {
           Сохранить
         </button>
         {isConfigured ? (
+          <>
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={() => {
+                setDraftToken('')
+                clearToken()
+                navigate('/signin')
+              }}
+            >
+              Выйти
+            </button>
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={() => {
+                setDraftToken('')
+                clearToken()
+              }}
+            >
+              Очистить
+            </button>
+          </>
+        ) : (
           <button
-            className="button button--ghost"
+            className="button button--secondary"
             type="button"
             onClick={() => {
-              setDraftToken('')
-              clearToken()
+              navigate('/signin')
             }}
           >
-            Очистить
+            Вход
           </button>
-        ) : null}
+        )}
       </div>
     </section>
   )

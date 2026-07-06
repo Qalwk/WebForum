@@ -6,7 +6,7 @@ import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
 
 import skrepkaIcon from '../../../assets/home-legacy/skrepkaIcon.webp'
-import sendIcon from '../../../assets/home-legacy/sendIcon.webp'
+import { ComposerSendIcon } from '../../../shared/ui/composer-send-icon'
 
 type DescriptionLocationState = {
   themeTitle?: string
@@ -14,16 +14,18 @@ type DescriptionLocationState = {
 
 export function SectionDescriptionPage() {
   const navigate = useNavigate()
-  const location = useLocation()
+  const { search, hash, state: locationState } = useLocation()
   const { themeId } = useParams()
   const { token, authStatus, authError, isTelegram } = useSession()
 
-  useTelegramBackButton(isTelegram, () => {
-    navigate(-1)
-  })
+  function goToMainMenu() {
+    navigate({ pathname: '/', search, hash })
+  }
+
+  useTelegramBackButton(isTelegram, goToMainMenu)
 
   const [themeTitle, setThemeTitle] = useState(
-    (location.state as DescriptionLocationState | null)?.themeTitle ?? '',
+    (locationState as DescriptionLocationState | null)?.themeTitle ?? '',
   )
   const [isLoading, setIsLoading] = useState(Boolean(themeId && !themeTitle))
   const [errorMessage, setErrorMessage] = useState('')
@@ -103,7 +105,7 @@ export function SectionDescriptionPage() {
         <button
           className="desc-screen__back"
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={goToMainMenu}
         >
           <span className="desc-screen__back-chevron" aria-hidden>
             ‹
@@ -164,7 +166,7 @@ export function SectionDescriptionPage() {
           disabled
           aria-label="Отправить"
         >
-          <img src={sendIcon} alt="" width={22} height={22} />
+          <ComposerSendIcon />
         </button>
       </div>
     </div>
