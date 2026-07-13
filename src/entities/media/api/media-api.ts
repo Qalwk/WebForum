@@ -151,7 +151,7 @@ export function resolveMessageMediaPublicUrl(
   return buildStaticMessageAttachmentUrl(owner, basename)
 }
 
-const mediaBlobCache = new Map<string, Promise<string>>()
+const mediaBlobCache = new Map<string, Promise<Blob>>()
 
 /** Бэкенд отдаёт `url` на `/api/v1/media_files/{id}` — нужен Bearer, не прямой `<img src>`. */
 export function mediaFileRequiresAuth(media: { url: string }): boolean {
@@ -160,20 +160,19 @@ export function mediaFileRequiresAuth(media: { url: string }): boolean {
 }
 
 /**
- * GET /media_files/{id} с Bearer → blob: URL для `<img>` / `<video>`.
- * Токен в src напрямую передать нельзя — только так.
+ * GET /media_files/{id} с Bearer → Blob для `<img>` / `<video>`.
+ * Object URL создаётся в компоненте — общий кэш хранит только Blob.
  */
-export async function fetchAuthenticatedMediaBlobUrl(
+export async function fetchAuthenticatedMediaBlob(
   mediaFileId: string,
   token: string,
-): Promise<string> {
+): Promise<Blob> {
   const id = mediaFileId.trim()
   if (!id || !token) {
     throw new HttpError('Media file id or token is missing', 0, null)
   }
 
-  const cacheKey = id
-  const cached = mediaBlobCache.get(cacheKey)
+  const cached = mediaBlobCache.get(id)
   if (cached) {
     return cached
   }
@@ -195,13 +194,12 @@ export async function fetchAuthenticatedMediaBlobUrl(
       }
       throw new HttpError('Media file request failed', response.status, payload)
     }
-    const blob = await response.blob()
-    return URL.createObjectURL(blob)
+    return response.blob()
   })()
 
-  mediaBlobCache.set(cacheKey, promise)
+  mediaBlobCache.set(id, promise)
   promise.catch(() => {
-    mediaBlobCache.delete(cacheKey)
+    mediaBlobCache.delete(id)
   })
   return promise
 }

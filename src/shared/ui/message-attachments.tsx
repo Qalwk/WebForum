@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
-  fetchAuthenticatedMediaBlobUrl,
+  fetchAuthenticatedMediaBlob,
   mediaFileRequiresAuth,
   resolveMessageMediaPublicUrl,
 } from '../../entities/media/api/media-api'
@@ -63,14 +63,13 @@ function useAuthenticatedMediaSrc(
     setError(false)
     setSrc(null)
 
-    fetchAuthenticatedMediaBlobUrl(mediaFileId, token)
-      .then((url) => {
+    fetchAuthenticatedMediaBlob(mediaFileId, token)
+      .then((blob) => {
         if (cancelled) {
-          URL.revokeObjectURL(url)
           return
         }
-        blobUrl = url
-        setSrc(url)
+        blobUrl = URL.createObjectURL(blob)
+        setSrc(blobUrl)
         setLoading(false)
       })
       .catch(() => {
