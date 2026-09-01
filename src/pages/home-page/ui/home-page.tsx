@@ -8,16 +8,10 @@ import {
 import { getSectionMeta } from '../../../entities/theme/lib/section-meta'
 import {
   getSectionRouteKind,
-  IKR_SUBSECTION_CODES,
+  IKR_FIELD_NAMES,
   pathToPostChat,
   pathToTaskChat,
-  type IkrSubsectionCode,
 } from '../../../entities/theme/lib/section-routing'
-import {
-  fetchIkrSubsectionsFilled,
-  isIkrBlockComplete,
-  type IkrSubsectionFilled,
-} from '../../../entities/theme/lib/ikr-ui'
 import { getKnownThemeIds, saveKnownThemeIds } from '../../../entities/theme/model/theme-catalog'
 import type { Theme, ThemeSection, ThemeWithSections } from '../../../entities/theme/model/types'
 import { useSession } from '../../../entities/session/model/session-context'
@@ -45,7 +39,7 @@ type LoadState = 'idle' | 'loading' | 'error' | 'ready'
 const HOME_BUTTON_LABEL: Record<string, string> = {
   experience_exchange: 'Обмен опытом',
   description: 'Описание',
-  perfect_result: 'ИКР',
+  ikr: 'ИКР',
   project_modules: 'Модули проекта',
 }
 
@@ -73,6 +67,16 @@ function navigateToSection(p: NavigateSectionParams) {
     return
   }
 
+  const state = { themeTitle: theme.title, sectionCode }
+  if (kind === 'description') {
+    navigate(`/themes/${theme.id}/description`, { state })
+    return
+  }
+  if (kind === 'ikr_field') {
+    navigate(`/themes/${theme.id}/ikr`, { state })
+    return
+  }
+
   const row = sections.find((s) => s.section_code === sectionCode)
   if (!row) {
     const title = getSectionMeta(sectionCode).title
@@ -82,12 +86,6 @@ function navigateToSection(p: NavigateSectionParams) {
     return
   }
 
-  const state = { themeTitle: theme.title, sectionCode }
-
-  if (kind === 'description') {
-    navigate(`/themes/${theme.id}/description`, { state })
-    return
-  }
   if (kind === 'project_modules') {
     navigate('/themes/manage')
     return
@@ -109,13 +107,15 @@ const FALLBACK_THEME: ThemeWithSections = {
     author_id: null,
     title: 'Название раздела',
     is_group: false,
+    description: null,
+    ikr_desirable_effects: null,
+    ikr_undesirable_effects: null,
+    ikr_technical_modeling: null,
     created_at: '',
     updated_at: '',
   },
   sections: [
     { section_id: 'fallback-experience', section_code: 'experience_exchange' },
-    { section_id: 'fallback-description', section_code: 'description' },
-    { section_id: 'fallback-perfect-result', section_code: 'perfect_result' },
     { section_id: 'fallback-project-modules', section_code: 'project_modules' },
   ],
 }
@@ -170,10 +170,6 @@ export function HomePage() {
   const [ikrOpenByTheme, setIkrOpenByTheme] = useState<Record<string, boolean>>(
     {},
   )
-  /** Заполненность трёх подвкладок ИКР (посты через GET …/posts). */
-  const [ikrFilledByTheme, setIkrFilledByTheme] = useState<
-    Record<string, IkrSubsectionFilled | undefined>
-  >({})
 
   useEffect(() => {
     let isMounted = true
@@ -220,40 +216,6 @@ export function HomePage() {
       isMounted = false
     }
   }, [reloadKey, token])
-
-  useEffect(() => {
-    if (!token || loadState !== 'ready') {
-      return
-    }
-
-    let cancelled = false
-
-    async function fillIkr() {
-      try {
-        const next: Record<string, IkrSubsectionFilled | undefined> = {}
-        await Promise.all(
-          themes.map(async ({ theme: t, sections }) => {
-            try {
-              const fill = await fetchIkrSubsectionsFilled(t.id, sections, token)
-              next[t.id] = fill
-            } catch {
-              next[t.id] = undefined
-            }
-          }),
-        )
-        if (!cancelled) {
-          setIkrFilledByTheme(next)
-        }
-      } catch {
-        //
-      }
-    }
-
-    void fillIkr()
-    return () => {
-      cancelled = true
-    }
-  }, [token, themes, loadState])
 
   const rootThemeEntry = useMemo(() => {
     const sourceThemes = themes.length > 0 ? themes : [FALLBACK_THEME]
@@ -446,50 +408,40 @@ export function HomePage() {
                       {HOME_BUTTON_LABEL.experience_exchange}
                     </button>
                   ) : null}
-                  {byCode.get('description') ? (
-                    <button
-                      type="button"
-                      className="forum-home-section-btn"
-                      onClick={() => {
-                        goSectionForCard('description')
-                      }}
-                    >
-                      {HOME_BUTTON_LABEL.description}
-                    </button>
-                  ) : null}
-                  {byCode.get('perfect_result') ? (
-                    <button
-                      type="button"
-                      className={[
-                        'forum-home-section-btn forum-home-section-btn--ikr-main',
-                        (() => {
-                          const fill = ikrFilledByTheme[theme.id]
-                          if (!fill) {
-                            return 'forum-home-section-btn--ikr-accent'
-                          }
-                          return isIkrBlockComplete(fill)
-                            ? 'forum-home-section-btn--ikr-filled'
-                            : 'forum-home-section-btn--ikr-accent'
-                        })(),
-                      ]
-                        .join(' ')
-                        .trim()}
-                      onClick={() => {
-                        goSectionForCard('perfect_result')
-                      }}
-                    >
-                      {HOME_BUTTON_LABEL.perfect_result}
-                      {ikrOpen ? ' ▲' : ' ▼'}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="forum-home-section-btn"
+                    onClick={() => {
+                      goSectionForCard('description')
+                    }}
+                  >
+                    {HOME_BUTTON_LABEL.description}
+                  </button>
+                  <button
+                    type="button"
+                    className={[
+                      'forum-home-section-btn forum-home-section-btn--ikr-main',
+                      theme.ikr_desirable_effects?.trim() &&
+                      theme.ikr_technical_modeling?.trim() &&
+                      theme.ikr_undesirable_effects?.trim()
+                        ? 'forum-home-section-btn--ikr-filled'
+                        : 'forum-home-section-btn--ikr-accent',
+                    ].join(' ')}
+                    onClick={() => {
+                      goSectionForCard('ikr')
+                    }}
+                  >
+                    {HOME_BUTTON_LABEL.ikr}
+                    {ikrOpen ? ' ▲' : ' ▼'}
+                  </button>
                   {ikrOpen
-                    ? IKR_SUBSECTION_CODES.map((code) => {
-                        if (!byCode.get(code)) {
-                          return null
-                        }
-                        const fill = ikrFilledByTheme[theme.id]
-                        const subsectionFilled =
-                          fill?.[code as IkrSubsectionCode] ?? false
+                    ? IKR_FIELD_NAMES.map((code) => {
+                        const titleByField = {
+                          ikr_desirable_effects: 'Желаемые эффекты',
+                          ikr_technical_modeling: 'Техническое моделирование',
+                          ikr_undesirable_effects: 'Нежелательные эффекты',
+                        } as const
+                        const subsectionFilled = Boolean(theme[code]?.trim())
                         const subCls = subsectionFilled
                           ? 'forum-home-section-btn forum-home-section-btn--sub forum-home-section-btn--sub-ikr forum-home-section-btn--ikr-sub-filled'
                           : 'forum-home-section-btn forum-home-section-btn--sub forum-home-section-btn--sub-ikr forum-home-section-btn--ikr-accent'
@@ -502,7 +454,7 @@ export function HomePage() {
                               goSectionForCard(code)
                             }}
                           >
-                            {getSectionMeta(code).title}
+                            {titleByField[code]}
                           </button>
                         )
                       })

@@ -12,15 +12,11 @@ import type {
   PostMessageResponse,
 } from '../../../entities/message/model/types'
 import { getThemeById, getThemeSections } from '../../../entities/theme/api/theme-api'
-import { getIkrPostEmptyCopy, isIkrSubsection } from '../../../entities/theme/lib/ikr-copy'
 import { getSectionMeta } from '../../../entities/theme/lib/section-meta'
-import { countTextLines } from '../../../entities/theme/lib/ikr-ui'
 import {
   getSectionRouteKind,
-  pathToPostChat,
   pathToPostComments,
 } from '../../../entities/theme/lib/section-routing'
-import type { ThemeSection } from '../../../entities/theme/model/types'
 import { useSession } from '../../../entities/session/model/session-context'
 import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
@@ -59,12 +55,6 @@ export function SectionPostChatPage() {
   >({})
   const [pendingMediaIds, setPendingMediaIds] = useState<string[]>([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
-  const [themeSectionsCatalog, setThemeSectionsCatalog] = useState<ThemeSection[]>([])
-  /** Экран 13.2.1.7: при коротком первом посте «жел. эффекта» — превью соседних подвкладок. */
-  const [ikrPeek, setIkrPeek] = useState<{
-    techText?: string
-    undText?: string
-  }>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function goHome() {
@@ -87,9 +77,6 @@ export function SectionPostChatPage() {
 
       try {
         const sections = await getThemeSections(tid, token)
-        if (active) {
-          setThemeSectionsCatalog(sections)
-        }
         const mySection = sections.find((s) => s.section_id === sid)
         if (!active) {
           return
@@ -139,80 +126,7 @@ export function SectionPostChatPage() {
   }, [token, themeId, sectionId, state])
 
   useEffect(() => {
-    if (
-      !themeId ||
-      !token ||
-      sectionCode !== 'desirable_effects' ||
-      messages.length === 0
-    ) {
-      setIkrPeek({})
-      return
-    }
-    const main = messages[0]
-    if (!main || countTextLines(main.text) > 11) {
-      setIkrPeek({})
-      return
-    }
-
-    const techRow = themeSectionsCatalog.find(
-      (s) => s.section_code === 'technical_modeling',
-    )
-    const undRow = themeSectionsCatalog.find(
-      (s) => s.section_code === 'undesirable_effects',
-    )
-    let cancelled = false
-
-    async function peek() {
-      const next: { techText?: string; undText?: string } = {}
-      const tid = themeId
-      if (!tid) {
-        return
-      }
-      try {
-        if (techRow?.section_id) {
-          const rows = await getPosts(tid, techRow.section_id, token, {
-            limit: 1,
-            offset: 0,
-          })
-          if (!cancelled && rows[0]?.text?.trim()) {
-            next.techText = rows[0].text
-          }
-        }
-        if (undRow?.section_id) {
-          const rows = await getPosts(tid, undRow.section_id, token, {
-            limit: 1,
-            offset: 0,
-          })
-          if (!cancelled && rows[0]?.text?.trim()) {
-            next.undText = rows[0].text
-          }
-        }
-      } catch {
-        //
-      }
-      if (!cancelled) {
-        setIkrPeek(
-          next.techText || next.undText ? next : {},
-        )
-      }
-    }
-
-    void peek()
-    return () => {
-      cancelled = true
-    }
-  }, [themeId, token, sectionCode, messages, themeSectionsCatalog])
-
-  useEffect(() => {
-    if (
-      !token ||
-      !messages.length ||
-      sectionCode === 'technical_modeling'
-    ) {
-      if (sectionCode === 'technical_modeling') {
-        setStatsById({})
-        setUserReactionById({})
-      }
+    if (!token || !messages.length) {
       return
     }
     let active = true
@@ -426,36 +340,10 @@ export function SectionPostChatPage() {
     (sectionCode ? getSectionMeta(sectionCode).title : null) || 'Сообщения'
   const headerTitle = themeTitle || 'Тема'
 
-  const ikrEmpty =
-    messages.length === 0 && sectionCode && isIkrSubsection(sectionCode)
-      ? getIkrPostEmptyCopy(sectionCode, headerTitle)
-      : null
-
-  function truncatePeek(text: string, max: number) {
-    const t = text.trim()
-    if (t.length <= max) {
-      return t
-    }
-    return `${t.slice(0, max).trim()}…`
-  }
-
   let composerPlaceholder = 'Комментировать'
   if (sectionCode === 'chat_experiments') {
     composerPlaceholder = 'Добавить эксперимент'
-  } else if (sectionCode === 'desirable_effects') {
-    composerPlaceholder = 'Текст поста: желаемый эффект…'
-  } else if (sectionCode === 'technical_modeling') {
-    composerPlaceholder = 'Техническое моделирование…'
-  } else if (sectionCode === 'undesirable_effects') {
-    composerPlaceholder = 'Новый пост / нежелательный эффект…'
   }
-
-  const techPeekId = themeSectionsCatalog.find(
-    (s) => s.section_code === 'technical_modeling',
-  )?.section_id
-  const undPeekId = themeSectionsCatalog.find(
-    (s) => s.section_code === 'undesirable_effects',
-  )?.section_id
 
   return (
     <div className="page page--section-chat section-post-chat">
@@ -481,14 +369,7 @@ export function SectionPostChatPage() {
         aria-label="Лента постов"
       >
         {messages.length === 0 ? (
-          ikrEmpty ? (
-            <div className="section-chat__empty-block section-chat__empty-block--ikr">
-              <p className="section-chat__empty-line section-chat__empty-line--lead">
-                {ikrEmpty.lead}
-              </p>
-              <p className="section-chat__empty">{ikrEmpty.hint}</p>
-            </div>
-          ) : sectionCode === 'chat_experiments' ? (
+          sectionCode === 'chat_experiments' ? (
             <div className="section-chat__empty-block">
               <p className="section-chat__empty">
                 Придумайте название эксперимента и сформулируйте его сценарий
@@ -503,7 +384,6 @@ export function SectionPostChatPage() {
           ? messages.map((m) => {
               const stats = statsById[m.id] ?? { like: 0, dislike: 0 }
               const my = userReactionById[m.id] ?? null
-              const hideReactions = sectionCode === 'technical_modeling'
               return (
                 <PostMessageCard
                   key={m.id}
@@ -511,7 +391,7 @@ export function SectionPostChatPage() {
                   likeCount={stats.like}
                   dislikeCount={stats.dislike}
                   myReaction={my}
-                  hideReactions={hideReactions}
+                  allowComments={sectionCode === 'discussion' ? true : undefined}
                   onReaction={(id, kind) => {
                     void handleReactionClick(id, kind)
                   }}
@@ -535,78 +415,6 @@ export function SectionPostChatPage() {
             })
           : null}
 
-        {sectionCode === 'desirable_effects' &&
-        messages[0] &&
-        countTextLines(messages[0].text) <= 11 &&
-        (ikrPeek.techText || ikrPeek.undText) ? (
-          <section
-            className="section-chat__ikr-stack"
-            aria-label="Превью смежных подразделов ИКР"
-          >
-            {ikrPeek.techText && techPeekId ? (
-              <div className="section-chat__ikr-stack-item">
-                <p className="section-chat__ikr-stack-label">
-                  Техническое моделирование
-                </p>
-                <article className="section-chat__bubble section-chat__bubble--peek">
-                  <p className="section-chat__text">
-                    {truncatePeek(ikrPeek.techText, 320)}
-                  </p>
-                </article>
-                <button
-                  type="button"
-                  className="section-chat__ikr-stack-link"
-                  onClick={() => {
-                    navigate(
-                      {
-                        pathname: pathToPostChat(themeId!, techPeekId),
-                        search,
-                        hash,
-                      },
-                      {
-                        state: {
-                          themeTitle: themeTitle || undefined,
-                          sectionCode: 'technical_modeling',
-                        },
-                      },
-                    )
-                  }}
-                >
-                  Открыть техническое моделирование →
-                </button>
-              </div>
-            ) : null}
-            {ikrPeek.undText && undPeekId ? (
-              <div className="section-chat__ikr-stack-item section-chat__ikr-stack-item--und">
-                <p className="section-chat__ikr-stack-label">Нежелательные эффекты</p>
-                <article className="section-chat__bubble section-chat__bubble--peek section-chat__bubble--peek-mask">
-                  <p className="section-chat__text">{truncatePeek(ikrPeek.undText, 280)}</p>
-                </article>
-                <button
-                  type="button"
-                  className="section-chat__ikr-stack-link"
-                  onClick={() => {
-                    navigate(
-                      {
-                        pathname: pathToPostChat(themeId!, undPeekId),
-                        search,
-                        hash,
-                      },
-                      {
-                        state: {
-                          themeTitle: themeTitle || undefined,
-                          sectionCode: 'undesirable_effects',
-                        },
-                      },
-                    )
-                  }}
-                >
-                  Открыть нежелательные эффекты →
-                </button>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
       </div>
 
       <div className="section-chat__composer" role="region" aria-label="Новый пост">

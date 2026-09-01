@@ -5,6 +5,7 @@ export type SectionRouteKind =
   | 'description'
   | 'project_modules'
   | 'ikr_group'
+  | 'ikr_field'
   | 'post_messages'
   | 'task_messages'
 
@@ -15,9 +16,6 @@ const POST_MESSAGE_CODES = new Set<string>([
   'chat_qa',
   'chat_publications',
   'chat_experiments',
-  'desirable_effects',
-  'technical_modeling',
-  'undesirable_effects',
 ])
 
 const TASK_MESSAGE_CODES = new Set<string>(['chat_tasks'])
@@ -29,8 +27,11 @@ export function getSectionRouteKind(sectionCode: string): SectionRouteKind | nul
   if (sectionCode === 'project_modules') {
     return 'project_modules'
   }
-  if (sectionCode === 'perfect_result') {
+  if (sectionCode === 'ikr') {
     return 'ikr_group'
+  }
+  if (IKR_FIELD_NAMES.includes(sectionCode as IkrFieldName)) {
+    return 'ikr_field'
   }
   if (POST_MESSAGE_CODES.has(sectionCode)) {
     return 'post_messages'
@@ -58,11 +59,11 @@ export function pathToTaskChat(themeId: string, sectionId: string) {
   return `/themes/${themeId}/chats/${sectionId}/tasks`
 }
 
-/** Подпункты «Идеального результата» (раскрывающийся блок) */
-export const IKR_SUBSECTION_CODES = [
-  'desirable_effects',
-  'technical_modeling',
-  'undesirable_effects',
+/** Редактируемые поля ИКР сущности Theme. */
+export const IKR_FIELD_NAMES = [
+  'ikr_desirable_effects',
+  'ikr_technical_modeling',
+  'ikr_undesirable_effects',
 ] as const
 
-export type IkrSubsectionCode = (typeof IKR_SUBSECTION_CODES)[number]
+export type IkrFieldName = (typeof IKR_FIELD_NAMES)[number]

@@ -4,6 +4,7 @@ import type {
   CreateThemePayload,
   Theme,
   ThemeSection,
+  UpdateThemePayload,
 } from '../model/types'
 
 type IdResponse = {
@@ -16,6 +17,18 @@ export function getRootTheme(token: string) {
 
 export function getThemeById(themeId: string, token: string) {
   return requestJson<Theme>(`/themes/${themeId}`, { token })
+}
+
+export function updateTheme(
+  themeId: string,
+  payload: UpdateThemePayload,
+  token: string,
+) {
+  return requestJson<Theme>(`/themes/${themeId}`, {
+    method: 'PATCH',
+    token,
+    body: payload,
+  })
 }
 
 export async function getThemeSections(themeId: string, token: string) {

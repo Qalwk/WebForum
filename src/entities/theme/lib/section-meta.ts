@@ -15,31 +15,6 @@ const SECTION_META: Record<string, SectionMeta> = {
     description: 'Практики, кейсы и подходы участников.',
     actionLabel: 'Открыть',
   },
-  description: {
-    title: 'Описание раздела',
-    description: 'Информационный контент без реакций и комментариев.',
-    actionLabel: 'Открыть описание',
-  },
-  perfect_result: {
-    title: 'ИКР',
-    description: 'Создание и моделирование проектных решений по ТРИЗ (желаемый / тех. моделирование / нежелательные эффекты).',
-    actionLabel: 'Открыть',
-  },
-  desirable_effects: {
-    title: 'Желаемый эффект',
-    description: 'Формулировка целевого эффекта в функциях системы.',
-    actionLabel: 'Открыть',
-  },
-  technical_modeling: {
-    title: 'Техническое моделирование',
-    description: 'Описание модели решения; без реакций лайк/дизлайк.',
-    actionLabel: 'Открыть',
-  },
-  undesirable_effects: {
-    title: 'Нежелательные эффекты',
-    description: 'Обсуждение: каждый комментарий — один нежелательный эффект.',
-    actionLabel: 'Открыть',
-  },
   project_modules: {
     title: 'Модули проекта',
     description: 'Вход в управление темами и их организацией.',

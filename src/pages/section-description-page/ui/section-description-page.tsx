@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getThemeById } from '../../../entities/theme/api/theme-api'
+import type { Theme } from '../../../entities/theme/model/types'
 import { useSession } from '../../../entities/session/model/session-context'
 import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
@@ -27,6 +28,7 @@ export function SectionDescriptionPage() {
   const [themeTitle, setThemeTitle] = useState(
     (locationState as DescriptionLocationState | null)?.themeTitle ?? '',
   )
+  const [theme, setTheme] = useState<Theme | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(themeId && !themeTitle))
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -34,7 +36,7 @@ export function SectionDescriptionPage() {
     let isMounted = true
 
     async function run() {
-      if (!themeId || themeTitle || !token) {
+      if (!themeId || !token) {
         setIsLoading(false)
         return
       }
@@ -45,6 +47,7 @@ export function SectionDescriptionPage() {
         const theme = await getThemeById(themeId, token)
 
         if (isMounted) {
+          setTheme(theme)
           setThemeTitle(theme.title)
           setErrorMessage('')
         }
@@ -68,7 +71,7 @@ export function SectionDescriptionPage() {
     return () => {
       isMounted = false
     }
-  }, [themeId, themeTitle, token])
+  }, [themeId, token])
 
   if (!themeId) {
     return (
@@ -126,10 +129,14 @@ export function SectionDescriptionPage() {
       ) : null}
 
       <div className="desc-screen__main">
-        <p className="desc-screen__prompt">
-          Опиши суть, цели и перспективы этого проектного раздела в свободной
-          форме
-        </p>
+        {theme?.description?.trim() ? (
+          <p className="desc-screen__prompt">{theme.description}</p>
+        ) : (
+          <p className="desc-screen__prompt">
+            Описание темы пока не заполнено. Опиши её суть, цели и перспективы
+            в свободной форме.
+          </p>
+        )}
         <Link
           className="desc-screen__to-edit"
           to={editPath}

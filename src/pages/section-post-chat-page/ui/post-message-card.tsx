@@ -13,6 +13,8 @@ type PostMessageCardProps = {
   hideReactions?: boolean
   /** Отдельный экран обсуждения (как тред в Telegram). */
   onOpenCommentThread?: () => void
+  /** Серверное правило секции может явно разрешить комментарии. */
+  allowComments?: boolean
 }
 
 function formatShortDate(iso: string) {
@@ -44,8 +46,9 @@ export function PostMessageCard({
   onReaction,
   hideReactions = false,
   onOpenCommentThread,
+  allowComments,
 }: PostMessageCardProps) {
-  const canComment = m.allow_comments !== false
+  const canComment = allowComments ?? m.allow_comments !== false
   const showThread = canComment && onOpenCommentThread
 
   return (

@@ -6,9 +6,24 @@ export type Theme = {
   author_id: string | null
   title: string
   is_group: boolean
+  description: string | null
+  ikr_desirable_effects: string | null
+  ikr_undesirable_effects: string | null
+  ikr_technical_modeling: string | null
   created_at: string
   updated_at: string
 }
+
+export type UpdateThemePayload = Partial<
+  Pick<
+    Theme,
+    | 'title'
+    | 'description'
+    | 'ikr_desirable_effects'
+    | 'ikr_undesirable_effects'
+    | 'ikr_technical_modeling'
+  >
+>
 
 /** Строки из ответа секции: типы сообщений и флаги (см. message_types API). */
 export type SectionMessageTypeRule = {

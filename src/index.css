@@ -956,6 +956,14 @@ button.forum-home-section-btn.forum-home-section-btn--sub-ikr.forum-home-section
   line-height: 1.35;
   letter-spacing: 0.06em;
   color: #000;
+  white-space: pre-wrap;
+}
+
+.desc-edit__field {
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .desc-screen__to-edit {

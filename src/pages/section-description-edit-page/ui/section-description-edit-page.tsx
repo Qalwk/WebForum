@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { getThemeById } from '../../../entities/theme/api/theme-api'
+import { getThemeById, updateTheme } from '../../../entities/theme/api/theme-api'
 import { useSession } from '../../../entities/session/model/session-context'
 import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
@@ -20,6 +20,9 @@ export function SectionDescriptionEditPage() {
   const [heading, setHeading] = useState('')
   const [body, setBody] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [initialTitle, setInitialTitle] = useState('')
+  const [initialBody, setInitialBody] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   useTelegramBackButton(isTelegram && Boolean(themeId), () => {
     if (!themeId) {
@@ -35,13 +38,17 @@ export function SectionDescriptionEditPage() {
     let active = true
 
     async function run() {
-      if (!themeId || !token || themeTitle) {
+      if (!themeId || !token) {
         return
       }
       try {
         const theme = await getThemeById(themeId, token)
         if (active) {
           setThemeTitle(theme.title)
+          setHeading(theme.title)
+          setBody(theme.description ?? '')
+          setInitialTitle(theme.title)
+          setInitialBody(theme.description ?? '')
         }
       } catch (error) {
         if (active) {
@@ -56,7 +63,7 @@ export function SectionDescriptionEditPage() {
     return () => {
       active = false
     }
-  }, [themeId, token, themeTitle])
+  }, [themeId, token])
 
   if (!themeId) {
     return (
@@ -68,11 +75,49 @@ export function SectionDescriptionEditPage() {
     )
   }
 
-  function handlePublish() {
-    navigate(`/themes/${themeId}/description`, {
-      state: { themeTitle: themeTitle || undefined },
-      replace: true,
-    })
+  async function handlePublish() {
+    if (!themeId || !token) {
+      setLoadError('Для сохранения нужна авторизация.')
+      return
+    }
+
+    const nextTitle = heading.trim()
+    if (nextTitle.length < 3 || nextTitle.length > 32) {
+      setLoadError('Название темы должно содержать от 3 до 32 символов.')
+      return
+    }
+
+    const payload: { title?: string; description?: string | null } = {}
+    if (nextTitle !== initialTitle) {
+      payload.title = nextTitle
+    }
+    if (body !== initialBody) {
+      payload.description = body.trim() ? body : null
+    }
+
+    if (Object.keys(payload).length === 0) {
+      navigate(`/themes/${themeId}/description`, {
+        state: { themeTitle: nextTitle },
+        replace: true,
+      })
+      return
+    }
+
+    setIsSaving(true)
+    setLoadError('')
+    try {
+      const updated = await updateTheme(themeId, payload, token)
+      navigate(`/themes/${themeId}/description`, {
+        state: { themeTitle: updated.title },
+        replace: true,
+      })
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : 'Не удалось сохранить тему.',
+      )
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -135,9 +180,10 @@ export function SectionDescriptionEditPage() {
         <button
           type="button"
           className="desc-edit__publish"
-          onClick={handlePublish}
+          onClick={() => void handlePublish()}
+          disabled={isSaving || !token}
         >
-          Опубликовать
+          {isSaving ? 'Сохраняю…' : 'Сохранить'}
         </button>
       </div>
     </div>

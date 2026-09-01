@@ -6,6 +6,7 @@ import { PublicRoute } from './public-route'
 import { HomePage } from '../pages/home-page/ui/home-page'
 import { SectionDescriptionPage } from '../pages/section-description-page/ui/section-description-page'
 import { SectionDescriptionEditPage } from '../pages/section-description-edit-page/ui/section-description-edit-page'
+import { ThemeIkrPage } from '../pages/theme-ikr-page/ui/theme-ikr-page'
 import { ThemeManagementPage } from '../pages/theme-management-page/ui/theme-management-page'
 import { PostCommentsThreadPage } from '../pages/post-comments-thread-page/ui/post-comments-thread-page'
 import { SectionPostChatPage } from '../pages/section-post-chat-page/ui/section-post-chat-page'
@@ -45,6 +46,7 @@ export function AppRouter() {
             path="/themes/:themeId/description"
             element={<SectionDescriptionPage />}
           />
+          <Route path="/themes/:themeId/ikr" element={<ThemeIkrPage />} />
           <Route path="/themes/manage" element={<ThemeManagementPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route
