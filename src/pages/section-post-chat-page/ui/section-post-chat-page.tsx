@@ -341,7 +341,9 @@ export function SectionPostChatPage() {
   const headerTitle = themeTitle || 'Тема'
 
   let composerPlaceholder = 'Комментировать'
-  if (sectionCode === 'chat_experiments') {
+  if (sectionCode === 'experience_exchange') {
+    composerPlaceholder = 'Поделиться опытом'
+  } else if (sectionCode === 'chat_experiments') {
     composerPlaceholder = 'Добавить эксперимент'
   }
 

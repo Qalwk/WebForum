@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom'
 import {
   getRootTheme,
@@ -8,7 +8,6 @@ import {
 import { getSectionMeta } from '../../../entities/theme/lib/section-meta'
 import {
   getSectionRouteKind,
-  IKR_FIELD_NAMES,
   pathToPostChat,
   pathToTaskChat,
 } from '../../../entities/theme/lib/section-routing'
@@ -48,11 +47,10 @@ type NavigateSectionParams = {
   sections: ThemeSection[]
   sectionCode: string
   navigate: NavigateFunction
-  setIkrOpen: Dispatch<SetStateAction<Record<string, boolean>>>
 }
 
 function navigateToSection(p: NavigateSectionParams) {
-  const { theme, sections, sectionCode, navigate, setIkrOpen } = p
+  const { theme, sections, sectionCode, navigate } = p
   const app = getTelegramWebApp()
   const kind = getSectionRouteKind(sectionCode)
   if (!kind) {
@@ -60,10 +58,9 @@ function navigateToSection(p: NavigateSectionParams) {
     return
   }
   if (kind === 'ikr_group') {
-    setIkrOpen((prev) => ({
-      ...prev,
-      [theme.id]: !prev[theme.id],
-    }))
+    navigate(`/themes/${theme.id}/ikr`, {
+      state: { themeTitle: theme.title, sectionCode },
+    })
     return
   }
 
@@ -76,6 +73,10 @@ function navigateToSection(p: NavigateSectionParams) {
     navigate(`/themes/${theme.id}/ikr`, { state })
     return
   }
+  if (kind === 'project_modules') {
+    navigate('/themes/manage')
+    return
+  }
 
   const row = sections.find((s) => s.section_code === sectionCode)
   if (!row) {
@@ -86,10 +87,6 @@ function navigateToSection(p: NavigateSectionParams) {
     return
   }
 
-  if (kind === 'project_modules') {
-    navigate('/themes/manage')
-    return
-  }
   if (kind === 'post_messages') {
     navigate(pathToPostChat(theme.id, row.section_id), { state })
     return
@@ -167,9 +164,6 @@ export function HomePage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [themes, setThemes] = useState<ThemeWithSections[]>([])
   const [reloadKey, setReloadKey] = useState(0)
-  const [ikrOpenByTheme, setIkrOpenByTheme] = useState<Record<string, boolean>>(
-    {},
-  )
 
   useEffect(() => {
     let isMounted = true
@@ -332,7 +326,6 @@ export function HomePage() {
         <>
           {filteredThemes.map(({ theme, sections }) => {
             const byCode = new Map(sections.map((s) => [s.section_code, s]))
-            const ikrOpen = ikrOpenByTheme[theme.id] ?? false
             const footerTheme = rootThemeEntry?.theme ?? theme
             const footerSections = rootThemeEntry?.sections ?? sections
 
@@ -342,7 +335,6 @@ export function HomePage() {
                 sections: footerSections,
                 sectionCode: code,
                 navigate,
-                setIkrOpen: setIkrOpenByTheme,
               })
             }
 
@@ -352,7 +344,6 @@ export function HomePage() {
                 sections,
                 sectionCode: code,
                 navigate,
-                setIkrOpen: setIkrOpenByTheme,
               })
             }
 
@@ -432,44 +423,16 @@ export function HomePage() {
                     }}
                   >
                     {HOME_BUTTON_LABEL.ikr}
-                    {ikrOpen ? ' ▲' : ' ▼'}
                   </button>
-                  {ikrOpen
-                    ? IKR_FIELD_NAMES.map((code) => {
-                        const titleByField = {
-                          ikr_desirable_effects: 'Желаемые эффекты',
-                          ikr_technical_modeling: 'Техническое моделирование',
-                          ikr_undesirable_effects: 'Нежелательные эффекты',
-                        } as const
-                        const subsectionFilled = Boolean(theme[code]?.trim())
-                        const subCls = subsectionFilled
-                          ? 'forum-home-section-btn forum-home-section-btn--sub forum-home-section-btn--sub-ikr forum-home-section-btn--ikr-sub-filled'
-                          : 'forum-home-section-btn forum-home-section-btn--sub forum-home-section-btn--sub-ikr forum-home-section-btn--ikr-accent'
-                        return (
-                          <button
-                            key={code}
-                            type="button"
-                            className={subCls}
-                            onClick={() => {
-                              goSectionForCard(code)
-                            }}
-                          >
-                            {titleByField[code]}
-                          </button>
-                        )
-                      })
-                    : null}
-                  {byCode.get('project_modules') ? (
-                    <button
-                      type="button"
-                      className="forum-home-section-btn"
-                      onClick={() => {
-                        goSectionForCard('project_modules')
-                      }}
-                    >
-                      {HOME_BUTTON_LABEL.project_modules}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="forum-home-section-btn"
+                    onClick={() => {
+                      goSectionForCard('project_modules')
+                    }}
+                  >
+                    {HOME_BUTTON_LABEL.project_modules}
+                  </button>
                 </div>
 
                 <footer className="forum-home-footer" aria-label="Нижняя панель">
