@@ -16,6 +16,7 @@ import type { Theme, ThemeSection, ThemeWithSections } from '../../../entities/t
 import { useSession } from '../../../entities/session/model/session-context'
 import { HttpError } from '../../../shared/api/http-client'
 import { PageState } from '../../../shared/ui/page-state'
+import { ForumMenu } from '../../../shared/ui/forum-menu'
 import { getTelegramWebApp } from '../../../shared/lib/telegram-web-app'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
 
@@ -164,6 +165,7 @@ export function HomePage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [themes, setThemes] = useState<ThemeWithSections[]>([])
   const [reloadKey, setReloadKey] = useState(0)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -258,10 +260,20 @@ export function HomePage() {
     return ''
   }, [authError, authStatus, errorMessage, isTelegram, loadState, token])
 
+  if (isMenuOpen) {
+    return <ForumMenu onClose={() => setIsMenuOpen(false)} />
+  }
+
   return (
     <div className="page page--home">
       <header className="forum-home-toolbar">
-        <button className="forum-home-toolbar__icon-btn" type="button" aria-label="Меню">
+        <button
+          className="forum-home-toolbar__icon-btn"
+          type="button"
+          aria-label="Меню"
+          aria-expanded={isMenuOpen}
+          onClick={() => setIsMenuOpen(true)}
+        >
           <img src={burgerImg} alt="" width={32} height={32} />
         </button>
         <div className="forum-home-search">
