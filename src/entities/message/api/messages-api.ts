@@ -6,6 +6,7 @@ import {
 } from '../lib/normalize-message-author-fields'
 import type {
   CommentMessageResponse,
+  CompleteTaskAssignmentRequest,
   CreateCommentRequest,
   CreatePostRequest,
   CreateTaskAssignmentRequest,
@@ -241,6 +242,21 @@ export function getTaskAssignmentById(assignmentId: string, token: string) {
       task_assignment_id: assignmentId,
     })}`,
     { token },
+  )
+}
+
+export function completeTaskAssignment(
+  assignmentId: string,
+  body: CompleteTaskAssignmentRequest,
+  token: string,
+) {
+  return requestJson<TaskAssignmentResponse>(
+    `/messages/tasks/assignments/${assignmentId}/complete`,
+    {
+      method: 'POST',
+      token,
+      body,
+    },
   )
 }
 

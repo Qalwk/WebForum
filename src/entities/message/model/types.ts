@@ -123,6 +123,12 @@ export type CreateTaskAssignmentRequest = {
   is_partially?: boolean
 }
 
+export type TaskAssignmentStatus =
+  | 'in_progress'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+
 export type TaskAssignmentResponse = {
   id: string
   type: MessageTypeApi
@@ -136,8 +142,15 @@ export type TaskAssignmentResponse = {
   media_files: MessageMediaFileData[]
   content_id: string
   is_partially: boolean
-  status: string
+  status: TaskAssignmentStatus
   expires_at: string
+  completion_text: string | null
+  completed_at: string | null
+}
+
+export type CompleteTaskAssignmentRequest = {
+  text?: string | null
+  media_file_ids?: string[]
 }
 
 export type MessageAIImproveTextRequest = {

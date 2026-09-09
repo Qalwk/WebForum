@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { uploadMediaFiles } from '../../../entities/media/api/media-api'
 import {
-  createComment,
+  completeTaskAssignment,
   createTaskAssignment,
   getTaskAssignments,
 } from '../../../entities/message/api/messages-api'
@@ -58,15 +58,67 @@ function taskAuthorLabel(t: TaskMessageResponse) {
 
 function assignmentHeadline(a: TaskAssignmentResponse) {
   const until = formatDeadlineDate(a.expires_at)
-  if (a.is_partially) {
-    return `Часть задачи в работе_до ${until}`
+  if (a.status === 'completed') {
+    return a.is_partially ? 'Часть задачи выполнена' : 'Задача выполнена'
   }
-  return `Задача в работе_до ${until}`
+  if (a.status === 'failed') {
+    return a.is_partially
+      ? `Часть задачи не выполнена до ${until}`
+      : `Задача не выполнена до ${until}`
+  }
+  if (a.is_partially) {
+    return `Часть задачи в работе до ${until}`
+  }
+  return `Задача в работе до ${until}`
 }
 
-function isAssignmentDone(status: string) {
-  const s = status.toLowerCase()
-  return s.includes('done') || s.includes('complete') || s.includes('closed')
+function assignmentStatusLabel(a: TaskAssignmentResponse) {
+  switch (a.status) {
+    case 'in_progress':
+      return 'В работе'
+    case 'completed':
+      return 'Выполнено'
+    case 'failed':
+      return 'Не выполнено / срок истёк'
+    case 'cancelled':
+      return 'Отменено'
+  }
+}
+
+function apiErrorCode(error: HttpError): string | null {
+  if (!error.details || typeof error.details !== 'object') {
+    return null
+  }
+  const payload = error.details as Record<string, unknown>
+  if (typeof payload.error === 'string') {
+    return payload.error
+  }
+  if (payload.detail && typeof payload.detail === 'object') {
+    const detail = payload.detail as Record<string, unknown>
+    return typeof detail.error === 'string' ? detail.error : null
+  }
+  return null
+}
+
+function assignmentErrorMessage(error: unknown, action: 'assign' | 'complete') {
+  if (!(error instanceof HttpError)) {
+    return action === 'assign'
+      ? 'Не удалось взять задачу в работу.'
+      : 'Не удалось сдать задачу.'
+  }
+
+  switch (apiErrorCode(error)) {
+    case 'task_already_assigned':
+      return 'Задача уже взята кем-то другим.'
+    case 'task_assignment_access_denied':
+      return 'Сдать задачу может только пользователь, который взял её в работу.'
+    case 'task_assignment_state_conflict':
+      return 'Задача уже сдана или срок её выполнения истёк.'
+    default:
+      return error.status === 422
+        ? 'Добавьте описание выполнения или прикрепите файл.'
+        : error.message
+  }
 }
 
 function showError(message: string) {
@@ -109,9 +161,12 @@ export function TaskMessageCard({
   const reportFileRef = useRef<HTMLInputElement>(null)
 
   const { title, description } = parseTaskText(t.text)
-  const myAssignment = currentUserId
-    ? items.find((a) => a.author_id === currentUserId)
-    : undefined
+  const activeAssignment = items.find((a) => a.status === 'in_progress')
+
+  const reloadAssignments = useCallback(async () => {
+    const rows = await getTaskAssignments(t.id, token, { limit: 100, offset: 0 })
+    setItems(rows)
+  }, [t.id, token])
 
   useEffect(() => {
     let on = true
@@ -137,10 +192,20 @@ export function TaskMessageCard({
     }
   }, [t.id, token])
 
-  async function reloadAssignments() {
-    const rows = await getTaskAssignments(t.id, token, { limit: 100, offset: 0 })
-    setItems(rows)
-  }
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible') {
+        void reloadAssignments()
+      }
+    }
+
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [reloadAssignments])
 
   async function submitApplication() {
     const labor = parseInt(laborRatioStr.replace(/\s/g, ''), 10)
@@ -166,11 +231,18 @@ export function TaskMessageCard({
       setApplyNote('')
       await reloadAssignments()
     } catch (error) {
-      const err =
-        error instanceof HttpError
-          ? error.message
-          : 'Не удалось подать заявку.'
-      showError(err)
+      if (
+        error instanceof HttpError &&
+        apiErrorCode(error) === 'task_already_assigned'
+      ) {
+        setShowApply(false)
+        try {
+          await reloadAssignments()
+        } catch {
+          // Основная ошибка важнее ошибки фонового обновления списка.
+        }
+      }
+      showError(assignmentErrorMessage(error, 'assign'))
     } finally {
       setSending(false)
     }
@@ -196,37 +268,37 @@ export function TaskMessageCard({
     }
   }
 
-  async function submitCompletion() {
+  async function submitCompletion(assignmentId: string) {
     const note = reportText.trim()
     if (!note && reportMediaIds.length === 0) {
       showError('Добавьте описание или прикрепите файл.')
       return
     }
-    const reportBody = note
-      ? `✅ Задача выполнена\n\n${note}`
-      : '✅ Задача выполнена'
     setSending(true)
     try {
-      await createComment(
-        t.id,
-        themeId,
-        sectionId,
-        t.id,
+      const updated = await completeTaskAssignment(
+        assignmentId,
         {
-          text: reportBody,
+          text: note || null,
           media_file_ids: [...reportMediaIds],
         },
         token,
+      )
+      setItems((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
       )
       setReportText('')
       setReportMediaIds([])
       setOpenAssignmentId(null)
     } catch (error) {
-      const err =
-        error instanceof HttpError
-          ? error.message
-          : 'Не удалось сохранить отчёт. Нужен PATCH назначения на бэкенде.'
-      showError(err)
+      showError(assignmentErrorMessage(error, 'complete'))
+      if (error instanceof HttpError && error.status === 409) {
+        try {
+          await reloadAssignments()
+        } catch {
+          // Состояние обновится при следующем открытии страницы или фокусе окна.
+        }
+      }
     } finally {
       setSending(false)
     }
@@ -256,7 +328,7 @@ export function TaskMessageCard({
       <p className="section-chat__task-meta">Коэффициент задачи: {t.ratio}</p>
       <p className="section-chat__date">{formatShortDate(t.created_at)}</p>
 
-      {!myAssignment ? (
+      {!activeAssignment ? (
         <button
           type="button"
           className="section-chat__task-help-btn"
@@ -268,7 +340,7 @@ export function TaskMessageCard({
         </button>
       ) : null}
 
-      {showApply && !myAssignment ? (
+      {showApply && !activeAssignment ? (
         <div className="section-chat__assign-form section-chat__task-apply">
           <p className="section-chat__task-apply-title">Подача заявки</p>
           <label className="section-chat__assign-label" htmlFor={`labor-${t.id}`}>
@@ -346,14 +418,13 @@ export function TaskMessageCard({
         <ul className="section-chat__assign-list" aria-label="Заявки на задачу">
           {items.map((a) => {
             const mine = currentUserId && a.author_id === currentUserId
-            const done = isAssignmentDone(a.status)
             const expanded = openAssignmentId === a.id
             return (
               <li key={a.id} className="section-chat__assign-item section-chat__assign-item--child">
                 <p className="section-chat__assign-child-title">{assignmentHeadline(a)}</p>
                 <p className="section-chat__text">{a.text || '—'}</p>
                 <p className="section-chat__assign-meta">
-                  {done ? 'Задача выполнена' : a.status} · {formatShortDate(a.created_at)}
+                  {assignmentStatusLabel(a)} · {formatShortDate(a.created_at)}
                 </p>
                 {a.media_files.length > 0 ? (
                   <MessageAttachments
@@ -361,7 +432,7 @@ export function TaskMessageCard({
                     mediaFiles={a.media_files}
                   />
                 ) : null}
-                {mine && !done ? (
+                {mine && a.status === 'in_progress' ? (
                   <>
                     <button
                       type="button"
@@ -411,7 +482,7 @@ export function TaskMessageCard({
                           className="section-chat__task-done-btn"
                           disabled={sending}
                           onClick={() => {
-                            void submitCompletion()
+                            void submitCompletion(a.id)
                           }}
                         >
                           Задача выполнена
@@ -420,11 +491,24 @@ export function TaskMessageCard({
                     ) : null}
                   </>
                 ) : null}
-                {done ? (
+                {a.status === 'completed' ? (
                   <p className="section-chat__task-done-label">
                     {a.is_partially
                       ? 'Часть задачи выполнена'
                       : 'Задача выполнена'}
+                  </p>
+                ) : null}
+                {a.status === 'completed' && a.completion_text ? (
+                  <p className="section-chat__text">{a.completion_text}</p>
+                ) : null}
+                {a.status === 'completed' && a.completed_at ? (
+                  <p className="section-chat__assign-meta">
+                    Сдано {formatShortDate(a.completed_at)}
+                  </p>
+                ) : null}
+                {a.status === 'failed' ? (
+                  <p className="section-chat__task-done-label">
+                    Не выполнено / срок истёк
                   </p>
                 ) : null}
               </li>
