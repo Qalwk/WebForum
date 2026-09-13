@@ -343,8 +343,6 @@ export function SectionPostChatPage() {
   let composerPlaceholder = 'Комментировать'
   if (sectionCode === 'experience_exchange') {
     composerPlaceholder = 'Поделиться опытом'
-  } else if (sectionCode === 'chat_experiments') {
-    composerPlaceholder = 'Добавить эксперимент'
   }
 
   return (
@@ -371,15 +369,7 @@ export function SectionPostChatPage() {
         aria-label="Лента постов"
       >
         {messages.length === 0 ? (
-          sectionCode === 'chat_experiments' ? (
-            <div className="section-chat__empty-block">
-              <p className="section-chat__empty">
-                Придумайте название эксперимента и сформулируйте его сценарий
-              </p>
-            </div>
-          ) : (
-            <p className="section-chat__empty">Пока нет сообщений. Напишите первым.</p>
-          )
+          <p className="section-chat__empty">Пока нет сообщений. Напишите первым.</p>
         ) : null}
 
         {token && themeId && sectionId

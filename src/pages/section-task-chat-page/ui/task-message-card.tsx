@@ -18,6 +18,7 @@ type TaskMessageCardProps = {
   themeId: string
   sectionId: string
   currentUserId: string | null
+  isExperiment?: boolean
 }
 
 function defaultExpiresDate() {
@@ -56,20 +57,22 @@ function taskAuthorLabel(t: TaskMessageResponse) {
   return n ? n : authorIdPeek(t.author_id)
 }
 
-function assignmentHeadline(a: TaskAssignmentResponse) {
+function assignmentHeadline(a: TaskAssignmentResponse, isExperiment: boolean) {
+  const whole = isExperiment ? 'Эксперимент' : 'Задача'
+  const part = isExperiment ? 'Часть эксперимента' : 'Часть задачи'
   const until = formatDeadlineDate(a.expires_at)
   if (a.status === 'completed') {
-    return a.is_partially ? 'Часть задачи выполнена' : 'Задача выполнена'
+    return a.is_partially ? `${part} выполнена` : `${whole} выполнен${isExperiment ? '' : 'а'}`
   }
   if (a.status === 'failed') {
     return a.is_partially
-      ? `Часть задачи не выполнена до ${until}`
-      : `Задача не выполнена до ${until}`
+      ? `${part} не выполнена до ${until}`
+      : `${whole} не выполнен${isExperiment ? '' : 'а'} до ${until}`
   }
   if (a.is_partially) {
-    return `Часть задачи в работе до ${until}`
+    return `${part} в работе до ${until}`
   }
-  return `Задача в работе до ${until}`
+  return `${whole} в работе до ${until}`
 }
 
 function assignmentStatusLabel(a: TaskAssignmentResponse) {
@@ -100,20 +103,25 @@ function apiErrorCode(error: HttpError): string | null {
   return null
 }
 
-function assignmentErrorMessage(error: unknown, action: 'assign' | 'complete') {
+function assignmentErrorMessage(
+  error: unknown,
+  action: 'assign' | 'complete',
+  isExperiment: boolean,
+) {
+  const entityAccusative = isExperiment ? 'эксперимент' : 'задачу'
   if (!(error instanceof HttpError)) {
     return action === 'assign'
-      ? 'Не удалось взять задачу в работу.'
-      : 'Не удалось сдать задачу.'
+      ? `Не удалось взять ${entityAccusative} в работу.`
+      : `Не удалось сдать ${entityAccusative}.`
   }
 
   switch (apiErrorCode(error)) {
     case 'task_already_assigned':
-      return 'Задача уже взята кем-то другим.'
+      return `${isExperiment ? 'Эксперимент' : 'Задача'} уже взят${isExperiment ? '' : 'а'} кем-то другим.`
     case 'task_assignment_access_denied':
-      return 'Сдать задачу может только пользователь, который взял её в работу.'
+      return `Сдать ${entityAccusative} может только пользователь, который взял ${isExperiment ? 'его' : 'её'} в работу.`
     case 'task_assignment_state_conflict':
-      return 'Задача уже сдана или срок её выполнения истёк.'
+      return `${isExperiment ? 'Эксперимент' : 'Задача'} уже сдан${isExperiment ? '' : 'а'} или срок выполнения истёк.`
     default:
       return error.status === 422
         ? 'Добавьте описание выполнения или прикрепите файл.'
@@ -145,6 +153,7 @@ export function TaskMessageCard({
   themeId,
   sectionId,
   currentUserId,
+  isExperiment = false,
 }: TaskMessageCardProps) {
   const [showApply, setShowApply] = useState(false)
   const [items, setItems] = useState<TaskAssignmentResponse[]>([])
@@ -242,7 +251,7 @@ export function TaskMessageCard({
           // Основная ошибка важнее ошибки фонового обновления списка.
         }
       }
-      showError(assignmentErrorMessage(error, 'assign'))
+      showError(assignmentErrorMessage(error, 'assign', isExperiment))
     } finally {
       setSending(false)
     }
@@ -291,7 +300,7 @@ export function TaskMessageCard({
       setReportMediaIds([])
       setOpenAssignmentId(null)
     } catch (error) {
-      showError(assignmentErrorMessage(error, 'complete'))
+      showError(assignmentErrorMessage(error, 'complete', isExperiment))
       if (error instanceof HttpError && error.status === 409) {
         try {
           await reloadAssignments()
@@ -325,7 +334,9 @@ export function TaskMessageCard({
       ) : !title ? (
         <p className="section-chat__text">{t.text || '—'}</p>
       ) : null}
-      <p className="section-chat__task-meta">Коэффициент задачи: {t.ratio}</p>
+      <p className="section-chat__task-meta">
+        Коэффициент {isExperiment ? 'эксперимента' : 'задачи'}: {t.ratio}
+      </p>
       <p className="section-chat__date">{formatShortDate(t.created_at)}</p>
 
       {!activeAssignment ? (
@@ -336,7 +347,7 @@ export function TaskMessageCard({
             setShowApply((v) => !v)
           }}
         >
-          Готов помочь с задачей
+          {isExperiment ? 'Готов помочь с экспериментом' : 'Готов помочь с задачей'}
         </button>
       ) : null}
 
@@ -365,7 +376,7 @@ export function TaskMessageCard({
                 setFullTask(true)
               }}
             />
-            Выполню всю задачу
+            {isExperiment ? 'Проведу весь эксперимент' : 'Выполню всю задачу'}
           </label>
           <label className="section-chat__assign-check">
             <input
@@ -376,7 +387,7 @@ export function TaskMessageCard({
                 setFullTask(false)
               }}
             />
-            Выполню часть задачи
+            {isExperiment ? 'Проведу часть эксперимента' : 'Выполню часть задачи'}
           </label>
           <label className="section-chat__assign-label" htmlFor={`deadline-${t.id}`}>
             Дата завершения
@@ -415,13 +426,18 @@ export function TaskMessageCard({
       {loading ? <p className="section-chat__comments-hint">Загрузка назначений…</p> : null}
 
       {items.length > 0 ? (
-        <ul className="section-chat__assign-list" aria-label="Заявки на задачу">
+        <ul
+          className="section-chat__assign-list"
+          aria-label={isExperiment ? 'Заявки на эксперимент' : 'Заявки на задачу'}
+        >
           {items.map((a) => {
             const mine = currentUserId && a.author_id === currentUserId
             const expanded = openAssignmentId === a.id
             return (
               <li key={a.id} className="section-chat__assign-item section-chat__assign-item--child">
-                <p className="section-chat__assign-child-title">{assignmentHeadline(a)}</p>
+                <p className="section-chat__assign-child-title">
+                  {assignmentHeadline(a, isExperiment)}
+                </p>
                 <p className="section-chat__text">{a.text || '—'}</p>
                 <p className="section-chat__assign-meta">
                   {assignmentStatusLabel(a)} · {formatShortDate(a.created_at)}
@@ -485,7 +501,7 @@ export function TaskMessageCard({
                             void submitCompletion(a.id)
                           }}
                         >
-                          Задача выполнена
+                          {isExperiment ? 'Эксперимент проведён' : 'Задача выполнена'}
                         </button>
                       </div>
                     ) : null}
@@ -493,9 +509,7 @@ export function TaskMessageCard({
                 ) : null}
                 {a.status === 'completed' ? (
                   <p className="section-chat__task-done-label">
-                    {a.is_partially
-                      ? 'Часть задачи выполнена'
-                      : 'Задача выполнена'}
+                    {assignmentHeadline(a, isExperiment)}
                   </p>
                 ) : null}
                 {a.status === 'completed' && a.completion_text ? (

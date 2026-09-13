@@ -147,9 +147,12 @@ export function SectionTaskChatPage() {
 
         }
 
-        if (mySection.section_code !== 'chat_tasks') {
+        if (
+          mySection.section_code !== 'chat_tasks' &&
+          mySection.section_code !== 'chat_experiments'
+        ) {
 
-          setLoadError('Этот раздел открыт не в режиме чата задач.')
+          setLoadError('Этот раздел не поддерживает задачи или эксперименты.')
 
           return
 
@@ -329,6 +332,8 @@ export function SectionTaskChatPage() {
 
   const hasTasks = messages.length > 0
 
+  const isExperimentSection = sectionCode === 'chat_experiments'
+
 
 
   return (
@@ -371,7 +376,7 @@ export function SectionTaskChatPage() {
 
         role="feed"
 
-        aria-label="Список задач"
+        aria-label={isExperimentSection ? 'Список экспериментов' : 'Список задач'}
 
       >
 
@@ -381,7 +386,9 @@ export function SectionTaskChatPage() {
 
             <p className="section-chat__empty-line">
 
-              Нет опубликованных задач. Придумайте название задачи и сформулируйте её.
+              {isExperimentSection
+                ? 'Нет опубликованных экспериментов. Придумайте название эксперимента и сформулируйте его сценарий.'
+                : 'Нет опубликованных задач. Придумайте название задачи и сформулируйте её.'}
 
             </p>
 
@@ -407,6 +414,8 @@ export function SectionTaskChatPage() {
 
             currentUserId={currentUser?.id ?? null}
 
+            isExperiment={isExperimentSection}
+
           />
 
         ))}
@@ -424,6 +433,8 @@ export function SectionTaskChatPage() {
         token={token}
 
         hasTasks={hasTasks}
+
+        isExperiment={isExperimentSection}
 
         onCreated={() => {
 

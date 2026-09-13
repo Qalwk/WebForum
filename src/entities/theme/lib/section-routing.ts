@@ -15,10 +15,9 @@ const POST_MESSAGE_CODES = new Set<string>([
   'chat_ideas',
   'chat_qa',
   'chat_publications',
-  'chat_experiments',
 ])
 
-const TASK_MESSAGE_CODES = new Set<string>(['chat_tasks'])
+const TASK_MESSAGE_CODES = new Set<string>(['chat_tasks', 'chat_experiments'])
 
 export function getSectionRouteKind(sectionCode: string): SectionRouteKind | null {
   if (sectionCode === 'description') {

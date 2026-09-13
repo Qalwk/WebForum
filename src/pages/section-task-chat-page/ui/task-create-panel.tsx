@@ -10,6 +10,7 @@ import { getTelegramWebApp } from '../../../shared/lib/telegram-web-app'
 import skrepkaIcon from '../../../assets/home-legacy/skrepkaIcon.webp'
 
 const DEFAULT_TASK_RATIO = 50
+const GPT_REVIEW_TIMEOUT_MS = 20_000
 
 type CreateStep = 'title' | 'description' | 'review' | 'ratio'
 
@@ -18,6 +19,7 @@ type TaskCreatePanelProps = {
   sectionId: string
   token: string
   hasTasks: boolean
+  isExperiment?: boolean
   onCreated: () => void
 }
 
@@ -30,13 +32,34 @@ function showError(message: string) {
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  let timeoutId: number | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error('GPT request timed out'))
+        }, timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId)
+    }
+  }
+}
+
 export function TaskCreatePanel({
   themeId,
   sectionId,
   token,
   hasTasks,
+  isExperiment = false,
   onCreated,
 }: TaskCreatePanelProps) {
+  const entityName = isExperiment ? 'эксперимент' : 'задача'
+  const entityNameGenitive = isExperiment ? 'эксперимента' : 'задачи'
   const [open, setOpen] = useState(!hasTasks)
   const [step, setStep] = useState<CreateStep>('title')
   const [title, setTitle] = useState('')
@@ -67,16 +90,19 @@ export function TaskCreatePanel({
   async function runGptReview() {
     const combined = formatTaskText(title, description)
     if (!combined?.trim()) {
-      showError('Укажите название или описание задачи.')
+      showError(`Укажите название или описание ${entityNameGenitive}.`)
       return
     }
     setBusy(true)
     try {
-      const res = await improveMessageText(
-        themeId,
-        sectionId,
-        { text: combined },
-        token,
+      const res = await withTimeout(
+        improveMessageText(
+          themeId,
+          sectionId,
+          { text: combined },
+          token,
+        ),
+        GPT_REVIEW_TIMEOUT_MS,
       )
       const out = res.output_text?.trim()
       setGptText(out && out.length > 0 ? out : null)
@@ -122,7 +148,11 @@ export function TaskCreatePanel({
   async function publishTask() {
     const bodyText = formatTaskText(title, description)
     if (!bodyText?.trim()) {
-      showError('Задача не может быть пустой.')
+      showError(
+        isExperiment
+          ? 'Эксперимент не может быть пустым.'
+          : 'Задача не может быть пустой.',
+      )
       return
     }
     const ratio = (() => {
@@ -155,7 +185,7 @@ export function TaskCreatePanel({
       const message =
         error instanceof HttpError
           ? error.message
-          : 'Не удалось опубликовать задачу.'
+          : `Не удалось опубликовать ${entityName}.`
       showError(message)
     } finally {
       setBusy(false)
@@ -181,7 +211,11 @@ export function TaskCreatePanel({
 
   if (!open && hasTasks) {
     return (
-      <div className="section-chat__composer" role="region" aria-label="Новая задача">
+      <div
+        className="section-chat__composer"
+        role="region"
+        aria-label={isExperiment ? 'Новый эксперимент' : 'Новая задача'}
+      >
         <button
           type="button"
           className="section-chat__task-add-btn"
@@ -190,18 +224,22 @@ export function TaskCreatePanel({
             setStep('title')
           }}
         >
-          Добавить задачу
+          {isExperiment ? 'Добавить эксперимент' : 'Добавить задачу'}
         </button>
       </div>
     )
   }
 
   return (
-    <div className="section-chat__composer" role="region" aria-label="Создание задачи">
+    <div
+      className="section-chat__composer"
+      role="region"
+      aria-label={isExperiment ? 'Создание эксперимента' : 'Создание задачи'}
+    >
       {step === 'title' ? (
         <div className="section-chat__task-wizard">
           <label className="section-chat__task-wizard-label" htmlFor="task-title">
-            Название задачи
+            {isExperiment ? 'Название эксперимента' : 'Название задачи'}
           </label>
           <input
             id="task-title"
@@ -211,7 +249,11 @@ export function TaskCreatePanel({
             onChange={(e) => {
               setTitle(e.target.value)
             }}
-            placeholder="Назвать и сформулировать задачу"
+            placeholder={
+              isExperiment
+                ? 'Назвать эксперимент'
+                : 'Назвать и сформулировать задачу'
+            }
             maxLength={500}
             autoComplete="off"
           />
@@ -231,7 +273,7 @@ export function TaskCreatePanel({
       {step === 'description' ? (
         <div className="section-chat__task-wizard">
           <label className="section-chat__task-wizard-label" htmlFor="task-desc">
-            Описание задачи
+            {isExperiment ? 'Сценарий эксперимента' : 'Описание задачи'}
           </label>
           <textarea
             id="task-desc"
@@ -241,7 +283,11 @@ export function TaskCreatePanel({
             onChange={(e) => {
               setDescription(e.target.value)
             }}
-            placeholder="Сформулируйте задачу подробнее"
+            placeholder={
+              isExperiment
+                ? 'Опишите сценарий эксперимента'
+                : 'Сформулируйте задачу подробнее'
+            }
             maxLength={7500}
           />
           <div className="section-chat__task-wizard-actions">
@@ -323,7 +369,8 @@ export function TaskCreatePanel({
       {step === 'ratio' ? (
         <div className="section-chat__task-wizard">
           <p className="section-chat__task-wizard-hint">
-            Назначьте рейтинговый коэффициент задачи (1–100) или пропустите шаг.
+            Назначьте рейтинговый коэффициент {entityNameGenitive} (1–100) или
+            пропустите шаг.
           </p>
           <div className="section-chat__task-top">
             <label className="section-chat__task-skip">
@@ -404,7 +451,11 @@ export function TaskCreatePanel({
                 void publishTask()
               }}
             >
-              {busy ? '…' : 'Опубликовать задачу'}
+              {busy
+                ? '…'
+                : isExperiment
+                  ? 'Опубликовать эксперимент'
+                  : 'Опубликовать задачу'}
             </button>
             {hasTasks ? (
               <button

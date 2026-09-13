@@ -42,7 +42,7 @@ const SECTION_META: Record<string, SectionMeta> = {
   },
   chat_experiments: {
     title: 'Лаборатория экспериментов',
-    description: 'Публикации экспериментов (отдельно от чата задач).',
+    description: 'Эксперименты, исполнители и результаты проведения.',
     actionLabel: 'Открыть',
   },
 }
