@@ -20,6 +20,7 @@ type TaskCreatePanelProps = {
   token: string
   hasTasks: boolean
   isExperiment?: boolean
+  aiEnabled?: boolean
   onCreated: () => void
 }
 
@@ -30,6 +31,21 @@ function showError(message: string) {
   } else {
     window.alert(message)
   }
+}
+
+function apiErrorCode(error: HttpError): string | null {
+  if (!error.details || typeof error.details !== 'object') {
+    return null
+  }
+  const payload = error.details as Record<string, unknown>
+  if (typeof payload.error === 'string') {
+    return payload.error
+  }
+  if (payload.detail && typeof payload.detail === 'object') {
+    const detail = payload.detail as Record<string, unknown>
+    return typeof detail.error === 'string' ? detail.error : null
+  }
+  return null
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
@@ -56,6 +72,7 @@ export function TaskCreatePanel({
   token,
   hasTasks,
   isExperiment = false,
+  aiEnabled = true,
   onCreated,
 }: TaskCreatePanelProps) {
   const entityName = isExperiment ? 'эксперимент' : 'задача'
@@ -93,6 +110,14 @@ export function TaskCreatePanel({
       showError(`Укажите название или описание ${entityNameGenitive}.`)
       return
     }
+
+    if (!aiEnabled) {
+      setUseGpt(false)
+      setGptText(null)
+      setStep('ratio')
+      return
+    }
+
     setBusy(true)
     try {
       const res = await withTimeout(
@@ -108,6 +133,17 @@ export function TaskCreatePanel({
       setGptText(out && out.length > 0 ? out : null)
       setStep('review')
     } catch (error) {
+      if (
+        error instanceof HttpError &&
+        error.status === 409 &&
+        apiErrorCode(error) === 'ai_disabled_for_section'
+      ) {
+        setUseGpt(false)
+        setGptText(null)
+        setStep('ratio')
+        return
+      }
+
       const message =
         error instanceof HttpError
           ? error.message

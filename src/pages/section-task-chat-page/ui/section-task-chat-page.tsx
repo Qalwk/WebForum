@@ -67,6 +67,8 @@ export function SectionTaskChatPage() {
 
   const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(null)
 
+  const [sectionAiEnabled, setSectionAiEnabled] = useState(true)
+
 
 
   function goHome() {
@@ -159,6 +161,8 @@ export function SectionTaskChatPage() {
         }
 
         setSectionCode(mySection.section_code)
+
+        setSectionAiEnabled(mySection.ai_enabled !== false)
 
 
 
@@ -435,6 +439,8 @@ export function SectionTaskChatPage() {
         hasTasks={hasTasks}
 
         isExperiment={isExperimentSection}
+
+        aiEnabled={sectionAiEnabled}
 
         onCreated={() => {
 

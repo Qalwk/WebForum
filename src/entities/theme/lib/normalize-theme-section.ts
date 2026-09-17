@@ -14,6 +14,15 @@ export function normalizeThemeSection(raw: unknown): ThemeSection {
   const sectionCodeRaw = r.section_code ?? r.code
   const sectionId = typeof sectionIdRaw === 'string' ? sectionIdRaw : ''
   const sectionCode = typeof sectionCodeRaw === 'string' ? sectionCodeRaw : ''
+  const aiEnabledRaw =
+    r.ai_enabled ??
+    r.is_ai_enabled ??
+    r.openai_enabled ??
+    r.is_openai_enabled ??
+    r.allow_ai ??
+    r.allow_openai
+  const ai_enabled =
+    typeof aiEnabledRaw === 'boolean' ? aiEnabledRaw : undefined
 
   let message_types: SectionMessageTypeRule[] | undefined
   if (Array.isArray(r.message_types)) {
@@ -34,6 +43,9 @@ export function normalizeThemeSection(raw: unknown): ThemeSection {
   }
 
   const base: ThemeSection = { section_id: sectionId, section_code: sectionCode }
+  if (ai_enabled !== undefined) {
+    base.ai_enabled = ai_enabled
+  }
   if (message_types?.length) {
     base.message_types = message_types
   }

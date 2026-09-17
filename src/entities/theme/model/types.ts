@@ -37,6 +37,8 @@ export type ThemeSection = {
   section_id: string
   /** В API может приходить как `code`. */
   section_code: string
+  /** Серверный флаг доступности AI для секции, если backend его отдает. */
+  ai_enabled?: boolean
   /** Опционально: правила постов/задач по типам для этой секции. */
   message_types?: SectionMessageTypeRule[]
 }
