@@ -1489,6 +1489,12 @@ button.forum-home-section-btn.forum-home-section-btn--sub-ikr.forum-home-section
   list-style: disc;
 }
 
+.theme-module__empty {
+  margin: 12px 0 0;
+  color: #666;
+  font-size: 14px;
+}
+
 .theme-module__list li {
   margin-bottom: 6px;
 }

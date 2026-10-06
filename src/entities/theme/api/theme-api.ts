@@ -19,6 +19,23 @@ export function getThemeById(themeId: string, token: string) {
   return requestJson<Theme>(`/themes/${themeId}`, { token })
 }
 
+export function getChildThemes(themeId: string, token: string) {
+  return requestJson<Theme[]>(`/themes/${themeId}/children`, { token })
+}
+
+export function searchThemes(
+  query: string,
+  token: string,
+  { limit = 20, offset = 0 }: { limit?: number; offset?: number } = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(limit),
+    offset: String(offset),
+  })
+  return requestJson<Theme[]>(`/themes/search?${params}`, { token })
+}
+
 export function updateTheme(
   themeId: string,
   payload: UpdateThemePayload,

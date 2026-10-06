@@ -1,41 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   createTheme,
+  getChildThemes,
   getRootTheme,
   getThemeById,
 } from '../../../entities/theme/api/theme-api'
-import {
-  addKnownThemeId,
-  getKnownThemeIds,
-  saveKnownThemeIds,
-} from '../../../entities/theme/model/theme-catalog'
 import type { Theme } from '../../../entities/theme/model/types'
 import { useSession } from '../../../entities/session/model/session-context'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
 
-async function loadKnownThemeList(token: string) {
-  const rootTheme = await getRootTheme(token)
-  const knownIds = getKnownThemeIds().filter((themeId) => themeId !== rootTheme.id)
-
-  const extraThemes = await Promise.all(
-    knownIds.map(async (themeId) => {
-      try {
-        return await getThemeById(themeId, token)
-      } catch {
-        return null
-      }
-    }),
-  )
-
-  const validExtraThemes = extraThemes.filter((theme): theme is Theme => Boolean(theme))
-  saveKnownThemeIds(validExtraThemes.map((theme) => theme.id))
-
-  return { rootTheme, themes: [rootTheme, ...validExtraThemes] }
-}
-
 export function ThemeManagementPage() {
   const navigate = useNavigate()
+  const { themeId } = useParams()
   const { token, authStatus, authError, isTelegram } = useSession()
 
   useTelegramBackButton(isTelegram, () => {
@@ -47,7 +24,7 @@ export function ThemeManagementPage() {
   )
   const [errorMessage, setErrorMessage] = useState('')
   const [themes, setThemes] = useState<Theme[]>([])
-  const [rootThemeId, setRootThemeId] = useState('')
+  const [parentThemeId, setParentThemeId] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [panelOpen, setPanelOpen] = useState(true)
@@ -58,15 +35,20 @@ export function ThemeManagementPage() {
 
     async function run() {
       setLoadState('loading')
+      setParentThemeId('')
+      setThemes([])
 
       try {
-        const { rootTheme, themes: nextThemes } = await loadKnownThemeList(token)
+        const parentTheme = themeId
+          ? await getThemeById(themeId, token)
+          : await getRootTheme(token)
+        const nextThemes = await getChildThemes(parentTheme.id, token)
 
         if (!isMounted) {
           return
         }
 
-        setRootThemeId(rootTheme.id)
+        setParentThemeId(parentTheme.id)
         setThemes(nextThemes)
         setErrorMessage('')
         setLoadState('ready')
@@ -87,45 +69,57 @@ export function ThemeManagementPage() {
     if (token) {
       void run()
     } else {
+      setParentThemeId('')
+      setThemes([])
       setLoadState('ready')
     }
 
     return () => {
       isMounted = false
     }
-  }, [token])
+  }, [themeId, token])
 
   async function handleCreateTheme() {
     const title = draftTitle.trim()
 
-    if (!title || !rootThemeId) {
+    if (!title || !parentThemeId) {
       return
     }
 
     setIsSubmitting(true)
     setSubmitError('')
+    let created = false
 
     try {
-      const themeId = await createTheme(
+      const createdThemeId = await createTheme(
         {
           title,
-          parent_id: rootThemeId,
+          parent_id: parentThemeId,
           is_group: false,
           tech_version: 'minimum',
         },
         token,
       )
+      created = true
 
-      const createdTheme = await getThemeById(themeId, token)
-      addKnownThemeId(createdTheme.id)
-
-      setThemes((currentThemes) => [...currentThemes, createdTheme])
       setDraftTitle('')
+      try {
+        const createdTheme = await getThemeById(createdThemeId, token)
+        setThemes((currentThemes) =>
+          currentThemes.some((theme) => theme.id === createdTheme.id)
+            ? currentThemes
+            : [...currentThemes, createdTheme],
+        )
+      } catch {
+        setThemes(await getChildThemes(parentThemeId, token))
+      }
     } catch (error) {
       setSubmitError(
-        error instanceof Error
-          ? error.message
-          : 'Не удалось создать тему.',
+        created
+          ? 'Тема создана, но список не удалось обновить. Откройте экран заново.'
+          : error instanceof Error
+            ? error.message
+            : 'Не удалось создать тему.',
       )
     } finally {
       setIsSubmitting(false)
@@ -143,36 +137,10 @@ export function ThemeManagementPage() {
               'Не удалось получить Telegram-сессию. Режим управления открыт без backend-запросов.'
             : 'Нет токена доступа к API: откройте через Web App бота или задайте VITE_API_BEARER_TOKEN при сборке. Экран в статичном режиме.'
           : loadState === 'loading'
-            ? 'Получаю корневую тему и уже известные темы, созданные из приложения.'
+            ? 'Получаю дочерние темы с сервера.'
             : loadState === 'error'
-              ? `${errorMessage} Оставляю экран доступным в статичном режиме.`
+              ? errorMessage
               : ''
-
-  const displayThemes = themes.length
-    ? themes
-    : [
-        {
-          id: 'fallback-root-theme',
-          parent_id: null,
-          author_id: null,
-          title: 'Проект всего',
-          is_group: false,
-          description: null,
-          ikr_desirable_effects: null,
-          ikr_undesirable_effects: null,
-          ikr_technical_modeling: null,
-          created_at: '',
-          updated_at: '',
-        },
-      ]
-
-  const listForUi = useMemo(() => {
-    const child = displayThemes.filter((t) => t.parent_id !== null)
-    if (child.length > 0) {
-      return child
-    }
-    return displayThemes
-  }, [displayThemes])
 
   return (
     <div className="page page--theme-management theme-module-page">
@@ -202,7 +170,7 @@ export function ThemeManagementPage() {
             setPanelOpen((open) => !open)
           }}
         >
-          <span className="theme-module__head-title">Темы модули</span>
+          <span className="theme-module__head-title">Темы модуля</span>
           <span className="theme-module__chevron" aria-hidden>
             {panelOpen ? '▲' : '▼'}
           </span>
@@ -210,28 +178,25 @@ export function ThemeManagementPage() {
 
         {panelOpen ? (
           <>
+            {loadState === 'ready' && token && themes.length === 0 ? (
+              <p className="theme-module__empty">У этой темы пока нет дочерних тем.</p>
+            ) : null}
             <ul className="theme-module__list">
-              {listForUi.map((theme) => {
-                const isChild = Boolean(theme.parent_id)
-                return (
-                  <li key={theme.id}>
-                    <button
-                      className="theme-module__list-link"
-                      type="button"
-                      onClick={() => {
-                        navigate(`/themes/${theme.id}/description`, {
-                          state: { themeTitle: theme.title },
-                        })
-                      }}
-                    >
-                      {theme.title}
-                      {!isChild ? (
-                        <span className="theme-module__list-meta"> (корневая)</span>
-                      ) : null}
-                    </button>
-                  </li>
-                )
-              })}
+              {themes.map((theme) => (
+                <li key={theme.id}>
+                  <button
+                    className="theme-module__list-link"
+                    type="button"
+                    onClick={() => {
+                      navigate(`/themes/${theme.id}/description`, {
+                        state: { themeTitle: theme.title },
+                      })
+                    }}
+                  >
+                    {theme.title}
+                  </button>
+                </li>
+              ))}
             </ul>
 
             <div className="theme-module__form">
@@ -250,7 +215,7 @@ export function ThemeManagementPage() {
                 className="theme-module__submit"
                 type="button"
                 onClick={() => void handleCreateTheme()}
-                disabled={isSubmitting || !draftTitle.trim() || !token}
+                disabled={isSubmitting || !draftTitle.trim() || !parentThemeId || !token}
               >
                 {isSubmitting ? 'Добавляю…' : 'Добавить тему'}
               </button>
