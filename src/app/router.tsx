@@ -49,6 +49,7 @@ export function AppRouter() {
           <Route path="/themes/:themeId/ikr" element={<ThemeIkrPage />} />
           <Route path="/themes/manage" element={<ThemeManagementPage />} />
           <Route path="/themes/:themeId/manage" element={<ThemeManagementPage />} />
+          <Route path="/themes/:themeId" element={<HomePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route
             path="/themes/:themeId/chats/:sectionId/posts/:postId/comments"

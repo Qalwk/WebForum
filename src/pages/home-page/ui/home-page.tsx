@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams, type NavigateFunction } from 'react-router-dom'
 import {
+  getThemeById,
   getRootTheme,
   getThemeSections,
   searchThemes,
@@ -11,7 +12,7 @@ import {
   pathToPostChat,
   pathToTaskChat,
 } from '../../../entities/theme/lib/section-routing'
-import type { ThemeSection, ThemeWithSections } from '../../../entities/theme/model/types'
+import type { Theme, ThemeSection, ThemeWithSections } from '../../../entities/theme/model/types'
 import { useSession } from '../../../entities/session/model/session-context'
 import { HttpError } from '../../../shared/api/http-client'
 import { PageState } from '../../../shared/ui/page-state'
@@ -98,29 +99,9 @@ function navigateToSection(p: NavigateSectionParams) {
   }
 }
 
-const FALLBACK_THEME: ThemeWithSections = {
-  theme: {
-    id: 'fallback-root-theme',
-    parent_id: null,
-    author_id: null,
-    title: 'Название раздела',
-    is_group: false,
-    description: null,
-    ikr_desirable_effects: null,
-    ikr_undesirable_effects: null,
-    ikr_technical_modeling: null,
-    created_at: '',
-    updated_at: '',
-  },
-  sections: [
-    { section_id: 'fallback-experience', section_code: 'experience_exchange' },
-    { section_id: 'fallback-project-modules', section_code: 'project_modules' },
-  ],
-}
-
-async function loadRootTheme(token: string): Promise<ThemeWithSections[]> {
-  const rootTheme = await getRootTheme(token)
-  return [{ theme: rootTheme, sections: await getThemeSections(rootTheme.id, token) }]
+async function loadTheme(themeId: string | undefined, token: string): Promise<ThemeWithSections> {
+  const theme = themeId ? await getThemeById(themeId, token) : await getRootTheme(token)
+  return { theme, sections: await getThemeSections(theme.id, token) }
 }
 
 function isTokenExpiredError(error: unknown) {
@@ -135,14 +116,17 @@ function isTokenExpiredError(error: unknown) {
 
 export function HomePage() {
   const navigate = useNavigate()
+  const { themeId } = useParams()
   const { search: locationSearch, hash: locationHash } = useLocation()
   const { token, authStatus, authError, isTelegram, clearToken } = useSession()
-  useTelegramBackButton(false, () => {})
   const [search, setSearch] = useState('')
+  const searchContainerRef = useRef<HTMLDivElement>(null)
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [errorMessage, setErrorMessage] = useState('')
-  const [themes, setThemes] = useState<ThemeWithSections[]>([])
-  const [searchResults, setSearchResults] = useState<ThemeWithSections[]>([])
+  const [currentTheme, setCurrentTheme] = useState<ThemeWithSections | null>(null)
+  const [loadedThemeId, setLoadedThemeId] = useState<string | undefined>()
+  const [searchResults, setSearchResults] = useState<Theme[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
   const [searchState, setSearchState] = useState<LoadState>('idle')
   const [searchError, setSearchError] = useState('')
   const [searchOffset, setSearchOffset] = useState(0)
@@ -151,21 +135,43 @@ export function HomePage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
+  useTelegramBackButton(isTelegram && Boolean(themeId), () => {
+    const parentId = loadedThemeId === themeId ? currentTheme?.theme.parent_id : null
+    navigate(parentId ? `/themes/${parentId}` : '/')
+  })
+
+  useEffect(() => {
+    if (!searchOpen) {
+      return
+    }
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!searchContainerRef.current?.contains(event.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [searchOpen])
+
   useEffect(() => {
     let isMounted = true
 
     async function run() {
       setLoadState('loading')
       setErrorMessage('')
+      setCurrentTheme(null)
 
       try {
-        const nextThemes = await loadRootTheme(token)
+        const nextTheme = await loadTheme(themeId, token)
 
         if (!isMounted) {
           return
         }
 
-        setThemes(nextThemes)
+        setCurrentTheme(nextTheme)
+        setLoadedThemeId(themeId)
         setLoadState('ready')
       } catch (error) {
         if (!isMounted) {
@@ -195,7 +201,7 @@ export function HomePage() {
     return () => {
       isMounted = false
     }
-  }, [clearToken, reloadKey, token])
+  }, [clearToken, reloadKey, themeId, token])
 
   useEffect(() => {
     const query = search.trim()
@@ -214,24 +220,13 @@ export function HomePage() {
             limit: SEARCH_PAGE_SIZE,
             offset: searchOffset,
           })
-          const entries = await Promise.all(
-            foundThemes.map(async (theme) => ({
-              theme,
-              sections: await getThemeSections(theme.id, token).catch((error: unknown) => {
-                if (isTokenExpiredError(error)) {
-                  throw error
-                }
-                return []
-              }),
-            })),
-          )
 
           if (!isCurrent) {
             return
           }
 
           setSearchResults((current) =>
-            searchOffset === 0 ? entries : [...current, ...entries],
+            searchOffset === 0 ? foundThemes : [...current, ...foundThemes],
           )
           setHasMoreSearchResults(foundThemes.length === SEARCH_PAGE_SIZE)
           setSearchState('ready')
@@ -259,29 +254,7 @@ export function HomePage() {
     }
   }, [clearToken, search, searchOffset, searchRetryKey, token])
 
-  const rootThemeEntry = useMemo(() => {
-    const sourceThemes = themes.length > 0 ? themes : [FALLBACK_THEME]
-    return (
-      sourceThemes.find((item) => item.theme.parent_id === null) ?? sourceThemes[0]
-    )
-  }, [themes])
-
-  const filteredThemes = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase()
-    const displayThemes = rootThemeEntry ? [rootThemeEntry] : [FALLBACK_THEME]
-
-    if (!normalizedSearch) {
-      return displayThemes
-    }
-
-    if (token) {
-      return searchResults
-    }
-
-    return displayThemes.filter((item) =>
-      item.theme.title.toLowerCase().includes(normalizedSearch),
-    )
-  }, [search, rootThemeEntry, searchResults, token])
+  const displayedTheme = loadedThemeId === themeId ? currentTheme : null
 
   const notice = useMemo(() => {
     if (authStatus === 'checking_telegram') {
@@ -299,16 +272,8 @@ export function HomePage() {
         : 'Нет access token: откройте приложение из Telegram или задайте VITE_API_BEARER_TOKEN для разработки. Показываю предпросмотр.'
     }
 
-    if (loadState === 'loading' || loadState === 'idle') {
-      return 'Загружаю темы и разделы из backend API.'
-    }
-
-    if (loadState === 'error') {
-      return `${errorMessage} Показываю запасной экран, чтобы можно было продолжить навигацию.`
-    }
-
     return ''
-  }, [authError, authStatus, errorMessage, isTelegram, loadState, token])
+  }, [authError, authStatus, isTelegram, token])
 
   if (isMenuOpen) {
     return <ForumMenu onClose={() => setIsMenuOpen(false)} />
@@ -326,13 +291,29 @@ export function HomePage() {
         >
           <img src={burgerImg} alt="" width={32} height={32} />
         </button>
-        <div className="forum-home-search">
+        <div
+          className="forum-home-search"
+          ref={searchContainerRef}
+          onBlur={(event) => {
+            if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+              setSearchOpen(false)
+            }
+          }}
+        >
           <input
             className="forum-home-search__input"
             type="search"
             value={search}
+            onFocus={() => setSearchOpen(true)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setSearchOpen(false)
+                event.currentTarget.blur()
+              }
+            }}
             onChange={(event) => {
               setSearch(event.target.value)
+              setSearchOpen(true)
               setSearchOffset(0)
               setSearchResults([])
               setHasMoreSearchResults(false)
@@ -344,6 +325,57 @@ export function HomePage() {
             enterKeyHint="search"
             autoComplete="off"
           />
+          {searchOpen && search.trim() ? (
+            <div
+              className="forum-home-search__dropdown"
+              id="forum-home-search-results"
+              role="region"
+              aria-label="Результаты поиска тем"
+            >
+              {!token || searchState === 'idle' ||
+              (searchState === 'loading' && searchResults.length === 0) ? (
+                <p className="forum-home-search__message">Ищу темы…</p>
+              ) : null}
+              {searchState === 'error' ? (
+                <div className="forum-home-search__message" role="alert">
+                  <span>{searchError}</span>
+                  <button type="button" onClick={() => setSearchRetryKey((value) => value + 1)}>
+                    Повторить
+                  </button>
+                </div>
+              ) : null}
+              {searchState === 'ready' && searchResults.length === 0 ? (
+                <p className="forum-home-search__message">Темы не найдены.</p>
+              ) : null}
+              {searchResults.map((theme) => (
+                <button
+                  className="forum-home-search__option"
+                  type="button"
+                  key={theme.id}
+                  onClick={() => {
+                    setSearch('')
+                    setSearchOpen(false)
+                    navigate(`/themes/${theme.id}`)
+                  }}
+                >
+                  {theme.title}
+                </button>
+              ))}
+              {hasMoreSearchResults ? (
+                <button
+                  className="forum-home-search__more"
+                  type="button"
+                  disabled={searchState === 'loading'}
+                  onClick={() => {
+                    setSearchState('loading')
+                    setSearchOffset((offset) => offset + SEARCH_PAGE_SIZE)
+                  }}
+                >
+                  {searchState === 'loading' ? 'Загружаю…' : 'Показать ещё'}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="forum-home-toolbar__right">
           <button className="forum-home-toolbar__icon-btn" type="button" aria-label="Поделиться">
@@ -369,48 +401,21 @@ export function HomePage() {
       {notice ? (
         <section className="forum-home-notice">
           <p>{notice}</p>
-          {loadState === 'error' && token ? (
-            <button
-              className="button button--secondary"
-              style={{ marginTop: 10 }}
-              type="button"
-              onClick={() => {
-                setReloadKey((value) => value + 1)
-              }}
-            >
-              Повторить загрузку
-            </button>
-          ) : null}
         </section>
       ) : null}
 
-      {search.trim() && token && searchState === 'error' ? (
-        <section className="forum-home-notice" role="alert">
-          <p>{searchError}</p>
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={() => setSearchRetryKey((value) => value + 1)}
-          >
-            Повторить поиск
-          </button>
-        </section>
-      ) : null}
-
-      {search.trim() && token &&
-      (searchState === 'idle' || searchState === 'loading') &&
-      searchResults.length === 0 ? (
-        <PageState title="Ищу темы…" description="Получаю результаты с сервера." />
-      ) : search.trim() && token && searchState === 'error' && searchResults.length === 0 ? (
-        null
-      ) : filteredThemes.length === 0 ? (
+      {!displayedTheme ? (
         <PageState
-          title="Темы не найдены"
-          description="Измени поисковый запрос или создай новую тему в модуле управления."
+          title={loadState === 'error' ? 'Не удалось открыть тему' : 'Загружаю тему…'}
+          description={loadState === 'error' ? errorMessage : 'Получаю тему с сервера.'}
+          action={loadState === 'error' ? {
+            label: 'Повторить',
+            onClick: () => setReloadKey((value) => value + 1),
+          } : undefined}
         />
       ) : (
         <>
-          {filteredThemes.map(({ theme, sections }) => {
+          {[displayedTheme].map(({ theme, sections }) => {
             const byCode = new Map(sections.map((s) => [s.section_code, s]))
             function go(code: string) {
               navigateToSection({
@@ -441,7 +446,11 @@ export function HomePage() {
                     type="button"
                     aria-label="Назад"
                     onClick={() => {
-                      getTelegramWebApp()?.close()
+                      if (theme.parent_id) {
+                        navigate(`/themes/${theme.parent_id}`)
+                      } else {
+                        getTelegramWebApp()?.close()
+                      }
                     }}
                   >
                     <img src={iconBackImg} alt="" />
@@ -574,19 +583,6 @@ export function HomePage() {
               </section>
             )
           })}
-          {search.trim() && token && hasMoreSearchResults ? (
-            <button
-              className="button button--secondary"
-              type="button"
-              disabled={searchState === 'loading'}
-              onClick={() => {
-                setSearchState('loading')
-                setSearchOffset((offset) => offset + SEARCH_PAGE_SIZE)
-              }}
-            >
-              {searchState === 'loading' ? 'Загружаю…' : 'Показать ещё'}
-            </button>
-          ) : null}
         </>
       )}
     </div>

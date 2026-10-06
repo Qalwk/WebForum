@@ -188,9 +188,7 @@ export function ThemeManagementPage() {
                     className="theme-module__list-link"
                     type="button"
                     onClick={() => {
-                      navigate(`/themes/${theme.id}/description`, {
-                        state: { themeTitle: theme.title },
-                      })
+                      navigate(`/themes/${theme.id}`)
                     }}
                   >
                     {theme.title}
@@ -227,7 +225,7 @@ export function ThemeManagementPage() {
         ) : null}
       </section>
 
-      <Link className="desc-screen__tab-link" to="/">
+      <Link className="desc-screen__tab-link" to={parentThemeId ? `/themes/${parentThemeId}` : '/'}>
         Вернуться на главный экран
       </Link>
     </div>
