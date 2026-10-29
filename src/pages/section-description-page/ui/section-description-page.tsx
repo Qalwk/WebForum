@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getThemeById } from '../../../entities/theme/api/theme-api'
 import type { Theme } from '../../../entities/theme/model/types'
+import { getCurrentUser } from '../../../entities/user/api/user-api'
 import { useSession } from '../../../entities/session/model/session-context'
 import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
+import { TabAboutLink } from '../../../shared/ui/tab-about-link'
+import { RichDescription } from '../../../shared/ui/rich-description'
 
 import skrepkaIcon from '../../../assets/home-legacy/skrepkaIcon.webp'
 import { ComposerSendIcon } from '../../../shared/ui/composer-send-icon'
@@ -20,7 +23,7 @@ export function SectionDescriptionPage() {
   const { token, authStatus, authError, isTelegram } = useSession()
 
   function goToMainMenu() {
-    navigate({ pathname: '/', search, hash })
+    navigate({ pathname: themeId ? `/themes/${themeId}` : '/', search, hash })
   }
 
   useTelegramBackButton(isTelegram, goToMainMenu)
@@ -29,6 +32,8 @@ export function SectionDescriptionPage() {
     (locationState as DescriptionLocationState | null)?.themeTitle ?? '',
   )
   const [theme, setTheme] = useState<Theme | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [isLoading, setIsLoading] = useState(Boolean(themeId && !themeTitle))
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -44,10 +49,14 @@ export function SectionDescriptionPage() {
       setIsLoading(true)
 
       try {
-        const theme = await getThemeById(themeId, token)
+        const [theme, user] = await Promise.all([
+          getThemeById(themeId, token),
+          getCurrentUser(token).catch(() => null),
+        ])
 
         if (isMounted) {
           setTheme(theme)
+          setCurrentUserId(user?.id ?? null)
           setThemeTitle(theme.title)
           setErrorMessage('')
         }
@@ -102,6 +111,15 @@ export function SectionDescriptionPage() {
   const screenTitle = themeTitle || 'Описание раздела'
   const editPath = `/themes/${themeId}/description/edit`
 
+  function openEditor() {
+    if (theme?.author_id && theme.author_id !== currentUserId) {
+      setPermissionDenied(true)
+      return
+    }
+    setPermissionDenied(false)
+    navigate(editPath, { state: { themeTitle: themeTitle || undefined } })
+  }
+
   return (
     <div className="page page--description desc-screen">
       <header className="desc-screen__header">
@@ -118,9 +136,16 @@ export function SectionDescriptionPage() {
         <h1 className="desc-screen__title">{screenTitle}</h1>
       </header>
 
-      <Link className="desc-screen__tab-link" to="/">
-        Подробнее об этой вкладке
-      </Link>
+      <TabAboutLink themeId={themeId} sectionCode="description" />
+
+      {permissionDenied ? (
+        <div className="ikr-screen__permission" role="status">
+          <p>Право редактировать описание не подтверждено. Для доступа обратитесь к администратору.</p>
+          <button type="button" disabled title="Запрос прав пока не поддерживается сервером">
+            Запросить право редактирования
+          </button>
+        </div>
+      ) : null}
 
       {notice ? (
         <section className="forum-home-notice desc-screen__notice">
@@ -130,20 +155,20 @@ export function SectionDescriptionPage() {
 
       <div className="desc-screen__main">
         {theme?.description?.trim() ? (
-          <p className="desc-screen__prompt">{theme.description}</p>
+          <RichDescription value={theme.description} />
         ) : (
           <p className="desc-screen__prompt">
             Описание темы пока не заполнено. Опиши её суть, цели и перспективы
             в свободной форме.
           </p>
         )}
-        <Link
+        <button
           className="desc-screen__to-edit"
-          to={editPath}
-          state={{ themeTitle: themeTitle || undefined }}
+          type="button"
+          onClick={openEditor}
         >
-          Редактировать описание
-        </Link>
+          <span aria-hidden>✎ </span>Редактировать описание
+        </button>
       </div>
 
       <div className="desc-screen__composer" aria-label="Поле описания">
@@ -151,17 +176,15 @@ export function SectionDescriptionPage() {
           className="desc-screen__composer-icon"
           type="button"
           aria-label="Вложение"
+          title="Вложения к описанию пока не поддерживаются сервером"
+          disabled
         >
           <img src={skrepkaIcon} alt="" width={24} height={24} />
         </button>
         <button
           className="desc-screen__composer-input-wrap"
           type="button"
-          onClick={() => {
-            navigate(editPath, {
-              state: { themeTitle: themeTitle || undefined },
-            })
-          }}
+          onClick={openEditor}
         >
           <span className="desc-screen__composer-placeholder">
             Описать раздел

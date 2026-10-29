@@ -9,6 +9,7 @@ import {
 import type { Theme } from '../../../entities/theme/model/types'
 import { useSession } from '../../../entities/session/model/session-context'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
+import { TabAboutLink } from '../../../shared/ui/tab-about-link'
 
 export function ThemeManagementPage() {
   const navigate = useNavigate()
@@ -154,6 +155,8 @@ export function ThemeManagementPage() {
         </button>
         <h1 className="theme-module-page__screen-title">Управление темами</h1>
       </header>
+
+      {parentThemeId ? <TabAboutLink themeId={parentThemeId} sectionCode="project_modules" /> : null}
 
       {notice ? (
         <section className="forum-home-notice theme-module-page__notice">

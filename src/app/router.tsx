@@ -8,6 +8,7 @@ import { SectionDescriptionPage } from '../pages/section-description-page/ui/sec
 import { SectionDescriptionEditPage } from '../pages/section-description-edit-page/ui/section-description-edit-page'
 import { ThemeIkrPage } from '../pages/theme-ikr-page/ui/theme-ikr-page'
 import { ThemeManagementPage } from '../pages/theme-management-page/ui/theme-management-page'
+import { TabGuidePage } from '../pages/tab-guide-page/ui/tab-guide-page'
 import { PostCommentsThreadPage } from '../pages/post-comments-thread-page/ui/post-comments-thread-page'
 import { SectionPostChatPage } from '../pages/section-post-chat-page/ui/section-post-chat-page'
 import { SectionTaskChatPage } from '../pages/section-task-chat-page/ui/section-task-chat-page'
@@ -47,6 +48,7 @@ export function AppRouter() {
             element={<SectionDescriptionPage />}
           />
           <Route path="/themes/:themeId/ikr" element={<ThemeIkrPage />} />
+          <Route path="/themes/:themeId/about/:sectionCode" element={<TabGuidePage />} />
           <Route path="/themes/manage" element={<ThemeManagementPage />} />
           <Route path="/themes/:themeId/manage" element={<ThemeManagementPage />} />
           <Route path="/themes/:themeId" element={<HomePage />} />

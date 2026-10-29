@@ -25,6 +25,8 @@ import skrepkaIcon from '../../../assets/home-legacy/skrepkaIcon.webp'
 import { ComposerSendIcon } from '../../../shared/ui/composer-send-icon'
 import { MessageAttachments } from '../../../shared/ui/message-attachments'
 import { UserAvatar } from '../../../shared/ui/user-avatar'
+import { ExpandableText } from '../../../shared/ui/expandable-text'
+import { TabAboutLink } from '../../../shared/ui/tab-about-link'
 import { getCurrentUser } from '../../../entities/user/api/user-api'
 import type { CurrentUserResponse } from '../../../entities/user/model/types'
 
@@ -438,6 +440,7 @@ export function PostCommentsThreadPage() {
         role="region"
         aria-label="Обсуждение"
       >
+        {themeId ? <TabAboutLink themeId={themeId} sectionCode={sectionCode || 'discussion'} className="section-chat__about-link" /> : null}
         {loading && !post ? (
           <p className="section-chat__empty">Загрузка…</p>
         ) : null}
@@ -478,9 +481,7 @@ export function PostCommentsThreadPage() {
                       className="message-att--compact"
                     />
                   ) : null}
-                  <p className="post-comments-thread__context-text">
-                    {post.text || '—'}
-                  </p>
+                  <ExpandableText text={post.text || '—'} className="post-comments-thread__context-text" />
                 </div>
               </div>
               <div className="post-comments-thread__context-meta">
@@ -558,9 +559,7 @@ export function PostCommentsThreadPage() {
                         className="message-att--compact"
                       />
                     ) : null}
-                    <p className="post-comments-thread__text">
-                      {c.text || '—'}
-                    </p>
+                    <ExpandableText text={c.text || '—'} className="post-comments-thread__text" />
                     <p className="post-comments-thread__time">
                       {formatShortTime(c.created_at)}
                     </p>

@@ -18,6 +18,7 @@ import { getSectionMeta } from '../../../entities/theme/lib/section-meta'
 import { useSession } from '../../../entities/session/model/session-context'
 
 import { PageState } from '../../../shared/ui/page-state'
+import { TabAboutLink } from '../../../shared/ui/tab-about-link'
 
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
 
@@ -371,6 +372,8 @@ export function SectionTaskChatPage() {
         <p className="section-chat__subtitle">{headerTitle}</p>
 
       </header>
+
+      <TabAboutLink themeId={themeId} sectionCode={sectionCode || 'chat_tasks'} className="section-chat__about-link" />
 
 
 

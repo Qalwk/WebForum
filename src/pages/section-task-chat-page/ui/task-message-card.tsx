@@ -10,6 +10,7 @@ import type { TaskAssignmentResponse, TaskMessageResponse } from '../../../entit
 import { HttpError } from '../../../shared/api/http-client'
 import { getTelegramWebApp } from '../../../shared/lib/telegram-web-app'
 import { MessageAttachments } from '../../../shared/ui/message-attachments'
+import { ExpandableText } from '../../../shared/ui/expandable-text'
 import { UserAvatar } from '../../../shared/ui/user-avatar'
 
 type TaskMessageCardProps = {
@@ -330,9 +331,9 @@ export function TaskMessageCard({
       ) : null}
       {title ? <p className="section-chat__task-title">{title}</p> : null}
       {description ? (
-        <p className="section-chat__text">{description}</p>
+        <ExpandableText text={description} className="section-chat__text" />
       ) : !title ? (
-        <p className="section-chat__text">{t.text || '—'}</p>
+        <ExpandableText text={t.text || '—'} className="section-chat__text" />
       ) : null}
       <p className="section-chat__task-meta">
         Коэффициент {isExperiment ? 'эксперимента' : 'задачи'}: {t.ratio}
@@ -438,7 +439,7 @@ export function TaskMessageCard({
                 <p className="section-chat__assign-child-title">
                   {assignmentHeadline(a, isExperiment)}
                 </p>
-                <p className="section-chat__text">{a.text || '—'}</p>
+                <ExpandableText text={a.text || '—'} className="section-chat__text" />
                 <p className="section-chat__assign-meta">
                   {assignmentStatusLabel(a)} · {formatShortDate(a.created_at)}
                 </p>
@@ -513,7 +514,7 @@ export function TaskMessageCard({
                   </p>
                 ) : null}
                 {a.status === 'completed' && a.completion_text ? (
-                  <p className="section-chat__text">{a.completion_text}</p>
+                  <ExpandableText text={a.completion_text} className="section-chat__text" />
                 ) : null}
                 {a.status === 'completed' && a.completed_at ? (
                   <p className="section-chat__assign-meta">

@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getThemeById, updateTheme } from '../../../entities/theme/api/theme-api'
+import { getCurrentUser } from '../../../entities/user/api/user-api'
 import { useSession } from '../../../entities/session/model/session-context'
 import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
+import { TabAboutLink } from '../../../shared/ui/tab-about-link'
+import { HttpError } from '../../../shared/api/http-client'
 
 type EditLocationState = {
   themeTitle?: string
@@ -23,6 +26,38 @@ export function SectionDescriptionEditPage() {
   const [initialTitle, setInitialTitle] = useState('')
   const [initialBody, setInitialBody] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [permissionDenied, setPermissionDenied] = useState(false)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+
+  function insertMarkup(kind: 'heading' | 'bold' | 'link') {
+    const textarea = bodyRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = body.slice(start, end)
+    let insertion: string
+    let selectStart: number
+    let selectEnd: number
+    if (kind === 'heading') {
+      insertion = `# ${selected || 'Заголовок'}`
+      selectStart = start + 2
+      selectEnd = start + insertion.length
+    } else if (kind === 'bold') {
+      insertion = `**${selected || 'жирный текст'}**`
+      selectStart = start + 2
+      selectEnd = start + insertion.length - 2
+    } else {
+      insertion = `[${selected || 'текст ссылки'}](https://example.com)`
+      selectStart = start + insertion.indexOf('https://')
+      selectEnd = start + insertion.length - 1
+    }
+    setBody(`${body.slice(0, start)}${insertion}${body.slice(end)}`)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(selectStart, selectEnd)
+    })
+  }
 
   useTelegramBackButton(isTelegram && Boolean(themeId), () => {
     if (!themeId) {
@@ -39,11 +74,16 @@ export function SectionDescriptionEditPage() {
 
     async function run() {
       if (!themeId || !token) {
+        if (active) setIsLoading(false)
         return
       }
       try {
-        const theme = await getThemeById(themeId, token)
+        const [theme, user] = await Promise.all([
+          getThemeById(themeId, token),
+          getCurrentUser(token).catch(() => null),
+        ])
         if (active) {
+          setPermissionDenied(Boolean(theme.author_id && theme.author_id !== user?.id))
           setThemeTitle(theme.title)
           setHeading(theme.title)
           setBody(theme.description ?? '')
@@ -56,6 +96,8 @@ export function SectionDescriptionEditPage() {
             error instanceof Error ? error.message : 'Не удалось загрузить тему.',
           )
         }
+      } finally {
+        if (active) setIsLoading(false)
       }
     }
 
@@ -76,6 +118,7 @@ export function SectionDescriptionEditPage() {
   }
 
   async function handlePublish() {
+    if (permissionDenied) return
     if (!themeId || !token) {
       setLoadError('Для сохранения нужна авторизация.')
       return
@@ -112,9 +155,13 @@ export function SectionDescriptionEditPage() {
         replace: true,
       })
     } catch (error) {
-      setLoadError(
-        error instanceof Error ? error.message : 'Не удалось сохранить тему.',
-      )
+      if (error instanceof HttpError && error.status === 403) {
+        setPermissionDenied(true)
+      } else {
+        setLoadError(
+          error instanceof Error ? error.message : 'Не удалось сохранить тему.',
+        )
+      }
     } finally {
       setIsSaving(false)
     }
@@ -143,11 +190,23 @@ export function SectionDescriptionEditPage() {
         </h1>
       </header>
 
+      <TabAboutLink themeId={themeId} sectionCode="description" />
+
       {loadError ? (
         <p className="desc-screen__warn">{loadError}</p>
       ) : null}
+      {isLoading ? <p className="desc-screen__prompt desc-screen__loading">Загружаю описание…</p> : null}
 
-      <div className="desc-edit__body">
+      {permissionDenied ? (
+        <div className="ikr-screen__permission" role="status">
+          <p>Право редактировать описание не подтверждено. Для доступа обратитесь к администратору.</p>
+          <button type="button" disabled title="Запрос прав пока не поддерживается сервером">
+            Запросить право редактирования
+          </button>
+        </div>
+      ) : null}
+
+      {!permissionDenied && !isLoading ? <div className="desc-edit__body">
         <label className="visually-hidden" htmlFor="desc-heading">
           Заголовок раздела
         </label>
@@ -164,8 +223,14 @@ export function SectionDescriptionEditPage() {
         <label className="visually-hidden" htmlFor="desc-body">
           Текст описания
         </label>
+        <div className="desc-edit__format" role="toolbar" aria-label="Форматирование описания">
+          <button type="button" onClick={() => insertMarkup('heading')}>Заголовок</button>
+          <button type="button" onClick={() => insertMarkup('bold')}>Жирный</button>
+          <button type="button" onClick={() => insertMarkup('link')}>Ссылка</button>
+        </div>
         <textarea
           id="desc-body"
+          ref={bodyRef}
           className="desc-edit__textarea"
           value={body}
           onChange={(event) => {
@@ -174,9 +239,10 @@ export function SectionDescriptionEditPage() {
           placeholder="Начните описание раздела…"
           rows={12}
         />
-      </div>
+        <p className="desc-edit__format-hint">Для ссылки замените пример адреса на нужный URL.</p>
+      </div> : null}
 
-      <div className="desc-edit__toolbar" role="group" aria-label="Публикация">
+      {!permissionDenied && !isLoading ? <div className="desc-edit__toolbar" role="group" aria-label="Публикация">
         <button
           type="button"
           className="desc-edit__publish"
@@ -185,7 +251,7 @@ export function SectionDescriptionEditPage() {
         >
           {isSaving ? 'Сохраняю…' : 'Сохранить'}
         </button>
-      </div>
+      </div> : null}
     </div>
   )
 }

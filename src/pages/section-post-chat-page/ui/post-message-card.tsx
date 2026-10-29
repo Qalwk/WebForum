@@ -1,6 +1,7 @@
 import type { MessageReactionTypeApi } from '../../../entities/message/model/types'
 import type { PostMessageResponse } from '../../../entities/message/model/types'
 import { MessageAttachments } from '../../../shared/ui/message-attachments'
+import { ExpandableText } from '../../../shared/ui/expandable-text'
 import { UserAvatar } from '../../../shared/ui/user-avatar'
 
 type PostMessageCardProps = {
@@ -66,7 +67,7 @@ export function PostMessageCard({
       {m.media_files.length > 0 ? (
         <MessageAttachments ownerMessageId={m.id} mediaFiles={m.media_files} />
       ) : null}
-      <p className="section-chat__text">{m.text || '—'}</p>
+      <ExpandableText text={m.text || '—'} className="section-chat__text" />
       <div
         className={
           hideReactions
@@ -104,10 +105,20 @@ export function PostMessageCard({
             </button>
           </div>
         )}
+        <span className="section-chat__views" aria-label="Просмотров: 1">👁 1</span>
         <span className="section-chat__date">
           {formatShortDate(m.created_at)}
         </span>
       </div>
+
+      <button
+        className="section-chat__donate"
+        type="button"
+        disabled
+        title="Донаты появятся после подключения оплаты"
+      >
+        Донат
+      </button>
 
       {showThread ? (
         <div className="section-chat__comments-block">
