@@ -2413,6 +2413,151 @@ code {
   margin: 0;
 }
 
+.section-info-page {
+  min-height: calc(100svh - 80px);
+}
+
+.section-info-page .tab-guide-page__header {
+  background: #eeeff1;
+}
+
+.section-info__content {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 280px;
+  margin: 12px 14px 28px;
+  padding: 18px 16px;
+  border: 1px solid #eceff2;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  color: #111;
+}
+
+.section-info__content .rich-description {
+  font-size: 16px;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+
+.section-info__content .rich-description h2:first-child,
+.section-info__content .rich-description h3:first-child {
+  margin-top: 0;
+}
+
+.section-info__description {
+  max-height: min(52svh, 440px);
+  overflow: hidden;
+}
+
+.section-info__description--open {
+  max-height: none;
+  overflow: visible;
+}
+
+.section-info__read-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1e88d3;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.section-info__placeholder {
+  margin: 0;
+  font-size: 17px;
+}
+
+.section-info__error {
+  margin: 10px 14px 0;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.section-info__content > .section-info__error {
+  margin: 0;
+}
+
+.section-info__attachments {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.section-info__image,
+.section-info__video {
+  display: block;
+  width: 100%;
+  max-height: 60svh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.section-info__audio { width: 100%; }
+.section-info__file { color: #1e88d3; overflow-wrap: anywhere; }
+.section-info__attachment-error { margin: 0; color: #b42318; }
+.section-info__attachment-loading { margin: 0; color: #6b7280; }
+
+.section-info__edit,
+.section-info__attach {
+  justify-self: start;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: #1e88d3;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.section-info__editor {
+  display: grid;
+  gap: 12px;
+}
+
+.section-info__editor label { font-weight: 600; }
+.section-info__editor textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.section-info__selected {
+  margin: 0;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.section-info__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.section-info__actions button {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.section-info__actions .section-info__save {
+  border-color: #1e88d3;
+  background: #1e88d3;
+  color: #fff;
+}
+
+.section-info__actions button:disabled { opacity: 0.55; cursor: default; }
+
 /* нижняя панель чата: как Figma / desc-screen — серая полоса, пилюля, скрепка, круг */
 
 .section-chat__media-note {

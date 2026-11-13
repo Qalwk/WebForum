@@ -117,7 +117,7 @@ function isTokenExpiredError(error: unknown) {
 export function HomePage() {
   const navigate = useNavigate()
   const { themeId } = useParams()
-  const { search: locationSearch, hash: locationHash } = useLocation()
+  const { pathname: locationPathname, search: locationSearch, hash: locationHash } = useLocation()
   const { token, authStatus, authError, isTelegram, clearToken } = useSession()
   const [search, setSearch] = useState('')
   const searchContainerRef = useRef<HTMLDivElement>(null)
@@ -276,7 +276,14 @@ export function HomePage() {
   }, [authError, authStatus, isTelegram, token])
 
   if (isMenuOpen) {
-    return <ForumMenu onClose={() => setIsMenuOpen(false)} />
+    return (
+      <ForumMenu
+        onClose={() => setIsMenuOpen(false)}
+        onOpenAboutResource={() => navigate('/about-resource', {
+          state: { from: `${locationPathname}${locationSearch}${locationHash}` },
+        })}
+      />
+    )
   }
 
   return (

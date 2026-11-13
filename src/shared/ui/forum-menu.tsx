@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react'
 
 type ForumMenuProps = {
   onClose: () => void
+  onOpenAboutResource: () => void
 }
 
 type MenuItem = {
   icon: string
   label: string
   value?: string
-  action?: 'close'
+  action?: 'close' | 'about-resource'
   trailing?: 'chevron' | 'toggle' | 'none'
 }
 
@@ -26,7 +27,7 @@ const MENU_ITEMS: MenuItem[] = [
     value: 'Русский',
   },
   { icon: '/menu-icons/message.webp', label: 'Написать нам' },
-  { icon: '/menu-icons/about.webp', label: 'О ресурсе' },
+  { icon: '/menu-icons/about.webp', label: 'О ресурсе', action: 'about-resource' },
   { icon: '/menu-icons/home.webp', label: 'На главную', action: 'close' },
   { icon: '/menu-icons/project.webp', label: 'Управление проектом' },
 ]
@@ -39,7 +40,7 @@ function StaticToggle() {
   )
 }
 
-export function ForumMenu({ onClose }: ForumMenuProps) {
+export function ForumMenu({ onClose, onOpenAboutResource }: ForumMenuProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -123,11 +124,11 @@ export function ForumMenu({ onClose }: ForumMenuProps) {
             </>
           )
 
-          return item.action === 'close' ? (
+          return item.action ? (
             <button
               className="forum-menu__item forum-menu__item--button"
               type="button"
-              onClick={onClose}
+              onClick={item.action === 'about-resource' ? onOpenAboutResource : onClose}
               key={item.label}
             >
               {content}
