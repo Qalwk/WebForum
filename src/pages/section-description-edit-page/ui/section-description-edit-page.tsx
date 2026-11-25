@@ -6,6 +6,7 @@ import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
 import { TabAboutLink } from '../../../shared/ui/tab-about-link'
 import { HttpError } from '../../../shared/api/http-client'
+import { RichDescription } from '../../../shared/ui/rich-description'
 
 type EditLocationState = {
   themeTitle?: string
@@ -36,6 +37,8 @@ export function SectionDescriptionEditPage() {
     const start = selectionRef.current.start
     const end = selectionRef.current.end
     const selected = body.slice(start, end)
+    let replaceStart = start
+    let replaceEnd = end
     let insertion: string
     let selectStart: number
     let selectEnd: number
@@ -44,21 +47,55 @@ export function SectionDescriptionEditPage() {
       selectStart = start + 2
       selectEnd = start + insertion.length
     } else if (kind === 'bold') {
-      insertion = `**${selected || 'жирный текст'}**`
-      selectStart = start + 2
-      selectEnd = start + insertion.length - 2
+      const opening = '**'
+      if (selected && body.slice(start - opening.length, start) === opening && body.slice(end, end + opening.length) === opening) {
+        replaceStart -= opening.length
+        replaceEnd += opening.length
+        insertion = selected
+        selectStart = replaceStart
+        selectEnd = replaceStart + selected.length
+      } else {
+        insertion = `${opening}${selected || 'жирный текст'}${opening}`
+        selectStart = start + opening.length
+        selectEnd = selectStart + (selected || 'жирный текст').length
+      }
     } else if (kind === 'italic') {
-      insertion = `*${selected || 'курсив'}*`
-      selectStart = start + 1
-      selectEnd = start + insertion.length - 1
+      const opening = '*'
+      if (selected && body[start - 1] === opening && body[end] === opening) {
+        replaceStart -= opening.length
+        replaceEnd += opening.length
+        insertion = selected
+        selectStart = replaceStart
+        selectEnd = replaceStart + selected.length
+      } else {
+        insertion = `${opening}${selected || 'курсив'}${opening}`
+        selectStart = start + opening.length
+        selectEnd = selectStart + (selected || 'курсив').length
+      }
     } else if (kind === 'underline') {
-      insertion = `__${selected || 'подчёркнутый текст'}__`
-      selectStart = start + 2
-      selectEnd = start + insertion.length - 2
+      const opening = '__'
+      if (selected && body.slice(start - opening.length, start) === opening && body.slice(end, end + opening.length) === opening) {
+        replaceStart -= opening.length
+        replaceEnd += opening.length
+        insertion = selected
+        selectStart = replaceStart
+        selectEnd = replaceStart + selected.length
+      } else {
+        insertion = `${opening}${selected || 'подчёркнутый текст'}${opening}`
+        selectStart = start + opening.length
+        selectEnd = selectStart + (selected || 'подчёркнутый текст').length
+      }
     } else if (kind === 'color') {
-      insertion = `{color:${color}}${selected || 'цветной текст'}{/color}`
-      selectStart = start + insertion.indexOf('}') + 1
-      selectEnd = start + insertion.indexOf('{/color}')
+      const openingMatch = body.slice(0, start).match(/\{color:(#[\da-f]{3,8}|[a-z]+)\}$/i)
+      const closing = '{/color}'
+      const content = selected || 'цветной текст'
+      insertion = `{color:${color}}${content}${closing}`
+      if (selected && openingMatch && body.slice(end, end + closing.length) === closing) {
+        replaceStart -= openingMatch[0].length
+        replaceEnd += closing.length
+      }
+      selectStart = replaceStart + insertion.indexOf('}') + 1
+      selectEnd = selectStart + content.length
     } else if (kind === 'internal-link') {
       insertion = `[[${selected || 'внутренняя ссылка'}|/themes/${themeId}]]`
       selectStart = start + insertion.indexOf('|') + 1
@@ -68,7 +105,7 @@ export function SectionDescriptionEditPage() {
       selectStart = start + insertion.indexOf('https://')
       selectEnd = start + insertion.length - 1
     }
-    setBody(`${body.slice(0, start)}${insertion}${body.slice(end)}`)
+    setBody(`${body.slice(0, replaceStart)}${insertion}${body.slice(replaceEnd)}`)
     selectionRef.current = { start: selectStart, end: selectEnd }
     requestAnimationFrame(() => {
       textarea.focus()
@@ -277,6 +314,18 @@ export function SectionDescriptionEditPage() {
               end: event.currentTarget.selectionEnd,
             }
           }}
+          onMouseUp={(event) => {
+            selectionRef.current = {
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            }
+          }}
+          onKeyUp={(event) => {
+            selectionRef.current = {
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            }
+          }}
           onBlur={(event) => {
             selectionRef.current = {
               start: event.currentTarget.selectionStart,
@@ -293,6 +342,12 @@ export function SectionDescriptionEditPage() {
           placeholder="Начните описание раздела…"
           rows={12}
         />
+        <section className="desc-edit__preview" aria-label="Предпросмотр форматирования">
+          <h2>Предпросмотр</h2>
+          {body.trim()
+            ? <RichDescription value={body} />
+            : <p className="desc-edit__preview-empty">Текст появится здесь с применённым форматированием.</p>}
+        </section>
         <p className="desc-edit__format-hint">Внутренняя ссылка ведёт на текущую тему; адреса можно заменить вручную.</p>
       </div> : null}
 

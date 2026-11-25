@@ -1560,17 +1560,52 @@ button.forum-home-section-btn.forum-home-section-btn--sub-ikr.forum-home-section
   width: 24px;
   min-width: 24px;
   height: 24px;
+  flex: 0 0 24px;
   padding: 0;
   border: 2px solid #fff;
   border-radius: 50%;
-  background: var(--swatch-color);
+  background-color: var(--swatch-color);
   box-shadow: 0 0 0 1px #b8c0cc;
   cursor: pointer;
+}
+
+.desc-edit__format button.desc-edit__color-swatch {
+  background-color: var(--swatch-color);
+  color: transparent;
 }
 
 .desc-edit__color-swatch:focus-visible {
   outline: 2px solid #1e88d3;
   outline-offset: 2px;
+}
+
+.desc-edit__preview {
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+}
+
+.desc-edit__preview h2 {
+  margin: 0 0 10px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.desc-edit__preview .rich-description {
+  color: #111827;
+}
+
+.desc-edit__preview .rich-description p:last-child {
+  margin-bottom: 0;
+}
+
+.desc-edit__preview-empty {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
 }
 
 .desc-edit__format-hint {
