@@ -17,7 +17,7 @@ export function ThemeManagementPage() {
   const { token, authStatus, authError, isTelegram } = useSession()
 
   useTelegramBackButton(isTelegram, () => {
-    navigate(-1)
+    navigate(themeId ? `/themes/${themeId}` : '/')
   })
 
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
@@ -149,7 +149,7 @@ export function ThemeManagementPage() {
         <button
           className="theme-module-page__back"
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(themeId ? `/themes/${themeId}` : '/')}
         >
           ← Назад
         </button>

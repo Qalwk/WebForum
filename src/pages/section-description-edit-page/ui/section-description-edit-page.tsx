@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getThemeById, updateTheme } from '../../../entities/theme/api/theme-api'
-import { getCurrentUser } from '../../../entities/user/api/user-api'
 import { useSession } from '../../../entities/session/model/session-context'
 import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
@@ -30,7 +29,7 @@ export function SectionDescriptionEditPage() {
   const [permissionDenied, setPermissionDenied] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
 
-  function insertMarkup(kind: 'heading' | 'bold' | 'link') {
+  function insertMarkup(kind: 'heading' | 'bold' | 'italic' | 'underline' | 'color' | 'link' | 'internal-link', color = '#1e88d3') {
     const textarea = bodyRef.current
     if (!textarea) return
     const start = textarea.selectionStart
@@ -46,6 +45,22 @@ export function SectionDescriptionEditPage() {
     } else if (kind === 'bold') {
       insertion = `**${selected || 'жирный текст'}**`
       selectStart = start + 2
+      selectEnd = start + insertion.length - 2
+    } else if (kind === 'italic') {
+      insertion = `*${selected || 'курсив'}*`
+      selectStart = start + 1
+      selectEnd = start + insertion.length - 1
+    } else if (kind === 'underline') {
+      insertion = `__${selected || 'подчёркнутый текст'}__`
+      selectStart = start + 2
+      selectEnd = start + insertion.length - 2
+    } else if (kind === 'color') {
+      insertion = `{color:${color}}${selected || 'цветной текст'}{/color}`
+      selectStart = start + insertion.indexOf('}') + 1
+      selectEnd = start + insertion.indexOf('{/color}')
+    } else if (kind === 'internal-link') {
+      insertion = `[[${selected || 'внутренняя ссылка'}|/themes/${themeId}]]`
+      selectStart = start + insertion.indexOf('|') + 1
       selectEnd = start + insertion.length - 2
     } else {
       insertion = `[${selected || 'текст ссылки'}](https://example.com)`
@@ -78,12 +93,9 @@ export function SectionDescriptionEditPage() {
         return
       }
       try {
-        const [theme, user] = await Promise.all([
-          getThemeById(themeId, token),
-          getCurrentUser(token).catch(() => null),
-        ])
+        const theme = await getThemeById(themeId, token)
         if (active) {
-          setPermissionDenied(Boolean(theme.author_id && theme.author_id !== user?.id))
+          setPermissionDenied(false)
           setThemeTitle(theme.title)
           setHeading(theme.title)
           setBody(theme.description ?? '')
@@ -224,9 +236,14 @@ export function SectionDescriptionEditPage() {
           Текст описания
         </label>
         <div className="desc-edit__format" role="toolbar" aria-label="Форматирование описания">
-          <button type="button" onClick={() => insertMarkup('heading')}>Заголовок</button>
-          <button type="button" onClick={() => insertMarkup('bold')}>Жирный</button>
-          <button type="button" onClick={() => insertMarkup('link')}>Ссылка</button>
+          <button type="button" onClick={() => insertMarkup('bold')} aria-label="Жирный"><strong>B</strong></button>
+          <button type="button" onClick={() => insertMarkup('italic')} aria-label="Курсив"><em>I</em></button>
+          <button type="button" onClick={() => insertMarkup('underline')} aria-label="Подчёркнутый"><u>U</u></button>
+          <button type="button" onClick={() => insertMarkup('link')}>Внешняя ссылка</button>
+          <button type="button" onClick={() => insertMarkup('internal-link')}>Внутренняя ссылка</button>
+          <label className="desc-edit__color" title="Цвет текста">Цвет
+            <input type="color" defaultValue="#1e88d3" onChange={(event) => insertMarkup('color', event.currentTarget.value)} aria-label="Выбрать цвет текста" />
+          </label>
         </div>
         <textarea
           id="desc-body"
@@ -239,7 +256,7 @@ export function SectionDescriptionEditPage() {
           placeholder="Начните описание раздела…"
           rows={12}
         />
-        <p className="desc-edit__format-hint">Для ссылки замените пример адреса на нужный URL.</p>
+        <p className="desc-edit__format-hint">Внутренняя ссылка ведёт на текущую тему; адреса можно заменить вручную.</p>
       </div> : null}
 
       {!permissionDenied && !isLoading ? <div className="desc-edit__toolbar" role="group" aria-label="Публикация">

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getThemeById } from '../../../entities/theme/api/theme-api'
 import type { Theme } from '../../../entities/theme/model/types'
-import { getCurrentUser } from '../../../entities/user/api/user-api'
 import { useSession } from '../../../entities/session/model/session-context'
 import { PageState } from '../../../shared/ui/page-state'
 import { useTelegramBackButton } from '../../../shared/hooks/use-telegram-back-button'
@@ -32,7 +31,6 @@ export function SectionDescriptionPage() {
     (locationState as DescriptionLocationState | null)?.themeTitle ?? '',
   )
   const [theme, setTheme] = useState<Theme | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [permissionDenied, setPermissionDenied] = useState(false)
   const [isLoading, setIsLoading] = useState(Boolean(themeId && !themeTitle))
   const [errorMessage, setErrorMessage] = useState('')
@@ -49,14 +47,10 @@ export function SectionDescriptionPage() {
       setIsLoading(true)
 
       try {
-        const [theme, user] = await Promise.all([
-          getThemeById(themeId, token),
-          getCurrentUser(token).catch(() => null),
-        ])
+        const theme = await getThemeById(themeId, token)
 
         if (isMounted) {
           setTheme(theme)
-          setCurrentUserId(user?.id ?? null)
           setThemeTitle(theme.title)
           setErrorMessage('')
         }
@@ -112,10 +106,6 @@ export function SectionDescriptionPage() {
   const editPath = `/themes/${themeId}/description/edit`
 
   function openEditor() {
-    if (theme?.author_id && theme.author_id !== currentUserId) {
-      setPermissionDenied(true)
-      return
-    }
     setPermissionDenied(false)
     navigate(editPath, { state: { themeTitle: themeTitle || undefined } })
   }
@@ -134,6 +124,15 @@ export function SectionDescriptionPage() {
           Назад
         </button>
         <h1 className="desc-screen__title">{screenTitle}</h1>
+        <button
+          className="desc-screen__edit-top"
+          type="button"
+          onClick={openEditor}
+          aria-label="Редактировать описание"
+          title="Редактировать описание"
+        >
+          ✎
+        </button>
       </header>
 
       <TabAboutLink themeId={themeId} sectionCode="description" />
@@ -162,13 +161,6 @@ export function SectionDescriptionPage() {
             в свободной форме.
           </p>
         )}
-        <button
-          className="desc-screen__to-edit"
-          type="button"
-          onClick={openEditor}
-        >
-          <span aria-hidden>✎ </span>Редактировать описание
-        </button>
       </div>
 
       <div className="desc-screen__composer" aria-label="Поле описания">

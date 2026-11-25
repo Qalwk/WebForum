@@ -4,6 +4,7 @@ import {
   getThemeById,
   getRootTheme,
   getThemeSections,
+  getChildThemes,
   searchThemes,
 } from '../../../entities/theme/api/theme-api'
 import { getSectionMeta } from '../../../entities/theme/lib/section-meta'
@@ -134,6 +135,10 @@ export function HomePage() {
   const [searchRetryKey, setSearchRetryKey] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [modulesOpen, setModulesOpen] = useState(false)
+  const [moduleThemes, setModuleThemes] = useState<Theme[]>([])
+  const [modulesLoading, setModulesLoading] = useState(false)
+  const [modulesError, setModulesError] = useState('')
 
   useTelegramBackButton(isTelegram && Boolean(themeId), () => {
     const parentId = loadedThemeId === themeId ? currentTheme?.theme.parent_id : null
@@ -255,6 +260,21 @@ export function HomePage() {
   }, [clearToken, search, searchOffset, searchRetryKey, token])
 
   const displayedTheme = loadedThemeId === themeId ? currentTheme : null
+
+  async function toggleModules(parentThemeId: string) {
+    const opening = !modulesOpen
+    setModulesOpen(opening)
+    setModulesError('')
+    if (!opening || !token) return
+    setModulesLoading(true)
+    try {
+      setModuleThemes(await getChildThemes(parentThemeId, token))
+    } catch (error) {
+      setModulesError(error instanceof Error ? error.message : 'Не удалось загрузить темы-модули.')
+    } finally {
+      setModulesLoading(false)
+    }
+  }
 
   const notice = useMemo(() => {
     if (authStatus === 'checking_telegram') {
@@ -455,8 +475,10 @@ export function HomePage() {
                     onClick={() => {
                       if (theme.parent_id) {
                         navigate(`/themes/${theme.parent_id}`)
-                      } else {
+                      } else if (isTelegram) {
                         getTelegramWebApp()?.close()
+                      } else if (window.history.length > 1) {
+                        navigate(-1)
                       }
                     }}
                   >
@@ -527,12 +549,31 @@ export function HomePage() {
                     type="button"
                     className="forum-home-section-btn"
                     onClick={() => {
-                      goSectionForCard('project_modules')
+                      void toggleModules(theme.id)
                     }}
+                    aria-expanded={modulesOpen}
                   >
                     {HOME_BUTTON_LABEL.project_modules}
                   </button>
                 </div>
+
+                {modulesOpen ? (
+                  <section className="forum-home-modules" aria-label="Темы-модули">
+                    <h2>Темы-модули</h2>
+                    {modulesLoading ? <p>Загружаю…</p> : null}
+                    {modulesError ? <p role="alert">{modulesError}</p> : null}
+                    {!modulesLoading && !modulesError && moduleThemes.length === 0 ? <p>Дочерних тем пока нет.</p> : null}
+                    <ul>
+                      {moduleThemes.map((moduleTheme) => (
+                        <li key={moduleTheme.id}>
+                          <button type="button" onClick={() => navigate(`/themes/${moduleTheme.id}`)}>
+                            {moduleTheme.title}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
 
                 <footer className="forum-home-footer" aria-label="Нижняя панель">
                   <div className="forum-home-footer__inner">
