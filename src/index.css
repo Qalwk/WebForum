@@ -1808,7 +1808,10 @@ button.forum-home-section-btn.forum-home-section-btn--sub-ikr.forum-home-section
 }
 
 .forum-home-modules {
-  margin: 8px 4px 14px;
+  width: 90%;
+  max-width: 412px;
+  justify-self: center;
+  margin: 8px auto 14px;
   padding: 8px 12px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 }
