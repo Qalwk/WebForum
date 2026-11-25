@@ -1543,23 +1543,34 @@ button.forum-home-section-btn.forum-home-section-btn--sub-ikr.forum-home-section
   font-size: 14px;
 }
 
-.desc-edit__color {
+.desc-edit__color-label {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  color: #1e88d3;
+  color: #4b5563;
   font-size: 14px;
 }
 
-.desc-edit__color input {
+.desc-edit__colors {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.desc-edit__color-swatch {
   width: 24px;
+  min-width: 24px;
   height: 24px;
   padding: 0;
-  border: 0;
-  background: transparent;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--swatch-color);
+  box-shadow: 0 0 0 1px #b8c0cc;
+  cursor: pointer;
+}
+
+.desc-edit__color-swatch:focus-visible {
+  outline: 2px solid #1e88d3;
+  outline-offset: 2px;
 }
 
 .desc-edit__format-hint {

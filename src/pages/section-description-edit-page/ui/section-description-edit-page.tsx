@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getThemeById, updateTheme } from '../../../entities/theme/api/theme-api'
 import { useSession } from '../../../entities/session/model/session-context'
@@ -28,12 +28,13 @@ export function SectionDescriptionEditPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [permissionDenied, setPermissionDenied] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const selectionRef = useRef({ start: 0, end: 0 })
 
   function insertMarkup(kind: 'heading' | 'bold' | 'italic' | 'underline' | 'color' | 'link' | 'internal-link', color = '#1e88d3') {
     const textarea = bodyRef.current
     if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
+    const start = selectionRef.current.start
+    const end = selectionRef.current.end
     const selected = body.slice(start, end)
     let insertion: string
     let selectStart: number
@@ -68,6 +69,7 @@ export function SectionDescriptionEditPage() {
       selectEnd = start + insertion.length - 1
     }
     setBody(`${body.slice(0, start)}${insertion}${body.slice(end)}`)
+    selectionRef.current = { start: selectStart, end: selectEnd }
     requestAnimationFrame(() => {
       textarea.focus()
       textarea.setSelectionRange(selectStart, selectEnd)
@@ -236,21 +238,56 @@ export function SectionDescriptionEditPage() {
           Текст описания
         </label>
         <div className="desc-edit__format" role="toolbar" aria-label="Форматирование описания">
-          <button type="button" onClick={() => insertMarkup('bold')} aria-label="Жирный"><strong>B</strong></button>
-          <button type="button" onClick={() => insertMarkup('italic')} aria-label="Курсив"><em>I</em></button>
-          <button type="button" onClick={() => insertMarkup('underline')} aria-label="Подчёркнутый"><u>U</u></button>
-          <button type="button" onClick={() => insertMarkup('link')}>Внешняя ссылка</button>
-          <button type="button" onClick={() => insertMarkup('internal-link')}>Внутренняя ссылка</button>
-          <label className="desc-edit__color" title="Цвет текста">Цвет
-            <input type="color" defaultValue="#1e88d3" onChange={(event) => insertMarkup('color', event.currentTarget.value)} aria-label="Выбрать цвет текста" />
-          </label>
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertMarkup('bold')} aria-label="Жирный"><strong>B</strong></button>
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertMarkup('italic')} aria-label="Курсив"><em>I</em></button>
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertMarkup('underline')} aria-label="Подчёркнутый"><u>U</u></button>
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertMarkup('link')}>Внешняя ссылка</button>
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertMarkup('internal-link')}>Внутренняя ссылка</button>
+          <span className="desc-edit__color-label">Цвет текста:</span>
+          <div className="desc-edit__colors" role="group" aria-label="Основные цвета текста">
+            {[
+              { name: 'Чёрный', value: '#111827' },
+              { name: 'Красный', value: '#d32f2f' },
+              { name: 'Оранжевый', value: '#ed6c02' },
+              { name: 'Зелёный', value: '#2e7d32' },
+              { name: 'Синий', value: '#1976d2' },
+              { name: 'Фиолетовый', value: '#7b1fa2' },
+            ].map((color) => (
+              <button
+                key={color.value}
+                type="button"
+                className="desc-edit__color-swatch"
+                style={{ '--swatch-color': color.value } as CSSProperties}
+                aria-label={color.name}
+                title={color.name}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => insertMarkup('color', color.value)}
+              />
+            ))}
+          </div>
         </div>
         <textarea
           id="desc-body"
           ref={bodyRef}
           className="desc-edit__textarea"
           value={body}
+          onSelect={(event) => {
+            selectionRef.current = {
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            }
+          }}
+          onBlur={(event) => {
+            selectionRef.current = {
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            }
+          }}
           onChange={(event) => {
+            selectionRef.current = {
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            }
             setBody(event.target.value)
           }}
           placeholder="Начните описание раздела…"
